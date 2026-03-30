@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PRD — Raj Electronics Stock Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg2: #f8f9fb;
+    --bg3: #f0f2f5;
+    --border: #e2e6ed;
+    --border2: #cdd2db;
+    --text: #0f1923;
+    --text2: #4a5568;
+    --text3: #8a95a3;
+    --accent: #1a56db;
+    --accent-light: #ebf0fd;
+    --green: #047857;
+    --green-light: #ecfdf5;
+    --red: #b91c1c;
+    --red-light: #fef2f2;
+    --amber: #92400e;
+    --amber-light: #fffbeb;
+    --purple: #5b21b6;
+    --purple-light: #f5f3ff;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Inter', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--sans); background: var(--bg2); color: var(--text); line-height: 1.7; font-size: 15px; }
+
+  /* PRINT */
+  @media print {
+    body { background: #fff; font-size: 13px; }
+    .sidebar { display: none; }
+    .content { margin-left: 0 !important; max-width: 100% !important; }
+    .page-break { page-break-before: always; }
+    @page { margin: 20mm; }
+  }
+
+  /* LAYOUT */
+  .layout { display: flex; min-height: 100vh; }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 260px; flex-shrink: 0; background: var(--bg);
+    border-right: 1px solid var(--border); position: sticky;
+    top: 0; height: 100vh; overflow-y: auto; padding: 24px 0;
+  }
+  .sidebar-logo {
+    padding: 0 20px 20px; border-bottom: 1px solid var(--border); margin-bottom: 16px;
+  }
+  .sidebar-logo-mark {
+    width: 36px; height: 36px; background: var(--accent);
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 10px;
+  }
+  .sidebar-title { font-size: 13px; font-weight: 700; color: var(--text); }
+  .sidebar-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .sidebar-section { padding: 0 12px; margin-bottom: 8px; }
+  .sidebar-section-label {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--text3); padding: 4px 8px; margin-bottom: 4px;
+  }
+  .sidebar-link {
+    display: block; padding: 7px 10px; border-radius: 6px;
+    font-size: 13px; color: var(--text2); text-decoration: none;
+    transition: all 0.15s; cursor: pointer;
+  }
+  .sidebar-link:hover { background: var(--bg2); color: var(--text); }
+  .sidebar-link.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+
+  /* CONTENT */
+  .content { flex: 1; max-width: 860px; padding: 48px 52px; }
+
+  /* COVER */
+  .cover {
+    background: var(--text); border-radius: 16px; padding: 48px;
+    margin-bottom: 48px; color: #fff; position: relative; overflow: hidden;
+  }
+  .cover::before {
+    content: ''; position: absolute; top: -60px; right: -60px;
+    width: 280px; height: 280px; border-radius: 50%;
+    background: rgba(26,86,219,0.3);
+  }
+  .cover::after {
+    content: ''; position: absolute; bottom: -80px; right: 60px;
+    width: 180px; height: 180px; border-radius: 50%;
+    background: rgba(255,255,255,0.05);
+  }
+  .cover-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase;
+    color: rgba(255,255,255,0.5); margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .cover-label::before { content: ''; display: block; width: 24px; height: 1px; background: rgba(255,255,255,0.3); }
+  .cover-title { font-size: 34px; font-weight: 700; line-height: 1.2; margin-bottom: 12px; position: relative; z-index: 1; }
+  .cover-sub { font-size: 16px; color: rgba(255,255,255,0.65); margin-bottom: 32px; max-width: 480px; }
+  .cover-meta { display: flex; gap: 32px; flex-wrap: wrap; position: relative; z-index: 1; }
+  .cover-meta-item { }
+  .cover-meta-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.4); margin-bottom: 3px; }
+  .cover-meta-value { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.9); }
+
+  /* SECTION HEADINGS */
+  .section { margin-bottom: 48px; }
+  .section-number {
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    color: var(--accent); letter-spacing: 0.1em; margin-bottom: 6px;
+    display: block;
+  }
+  h1 { font-size: 26px; font-weight: 700; color: var(--text); margin-bottom: 16px; line-height: 1.3; }
+  h2 { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 12px; margin-top: 32px; line-height: 1.3; }
+  h3 { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 10px; margin-top: 20px; }
+  p { color: var(--text2); margin-bottom: 14px; }
+  strong { color: var(--text); font-weight: 600; }
+
+  /* DIVIDER */
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+
+  /* CALLOUT BOXES */
+  .callout {
+    border-radius: 10px; padding: 16px 18px; margin-bottom: 16px;
+    display: flex; gap: 12px; align-items: flex-start; font-size: 14px;
+  }
+  .callout-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .callout-body { flex: 1; }
+  .callout-title { font-weight: 600; margin-bottom: 3px; }
+  .callout-info { background: var(--accent-light); border: 1px solid rgba(26,86,219,0.15); }
+  .callout-info .callout-title { color: var(--accent); }
+  .callout-info p { color: #3b4f7a; margin: 0; }
+  .callout-warn { background: var(--amber-light); border: 1px solid rgba(146,64,14,0.15); }
+  .callout-warn .callout-title { color: var(--amber); }
+  .callout-warn p { color: #6b3a0e; margin: 0; }
+  .callout-success { background: var(--green-light); border: 1px solid rgba(4,120,87,0.15); }
+  .callout-success .callout-title { color: var(--green); }
+  .callout-success p { color: #065f46; margin: 0; }
+
+  /* FEATURE CARDS */
+  .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+  @media(max-width:640px){ .feature-grid { grid-template-columns: 1fr; } }
+  .feature-card {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px;
+  }
+  .feature-card-icon { font-size: 22px; margin-bottom: 10px; }
+  .feature-card-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .feature-card-desc { font-size: 13px; color: var(--text2); line-height: 1.6; }
+
+  /* ROLE CARDS */
+  .role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  @media(max-width:640px){ .role-grid { grid-template-columns: 1fr; } }
+  .role-card { border-radius: 10px; padding: 20px; border: 1.5px solid; }
+  .role-admin { background: var(--accent-light); border-color: rgba(26,86,219,0.2); }
+  .role-employee { background: var(--green-light); border-color: rgba(4,120,87,0.2); }
+  .role-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+    font-family: var(--mono); margin-bottom: 12px; letter-spacing: 0.06em;
+  }
+  .role-admin .role-badge { background: var(--accent); color: #fff; }
+  .role-employee .role-badge { background: var(--green); color: #fff; }
+  .role-card h3 { margin-top: 0; font-size: 15px; }
+  .role-admin h3 { color: #1e3a8a; }
+  .role-employee h3 { color: #065f46; }
+
+  /* PERMISSION TABLE */
+  .perm-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px; }
+  .perm-table thead { background: var(--bg3); }
+  .perm-table th {
+    padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.07em; text-transform: uppercase; color: var(--text2);
+    border-bottom: 2px solid var(--border);
+  }
+  .perm-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text2); }
+  .perm-table tr:last-child td { border-bottom: none; }
+  .perm-table .feature-name { font-weight: 500; color: var(--text); }
+  .tick { color: var(--green); font-size: 16px; font-weight: 700; }
+  .cross { color: var(--red); font-size: 16px; }
+  .perm-table tr:hover { background: var(--bg2); }
+
+  /* NUMBERED LIST */
+  .num-list { list-style: none; padding: 0; margin-bottom: 16px; }
+  .num-list li {
+    display: flex; gap: 14px; align-items: flex-start;
+    padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text2);
+  }
+  .num-list li:last-child { border-bottom: none; }
+  .num-badge {
+    width: 26px; height: 26px; border-radius: 50%; background: var(--accent-light);
+    color: var(--accent); font-size: 12px; font-weight: 700; font-family: var(--mono);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;
+  }
+
+  /* BULLET LIST */
+  .b-list { list-style: none; padding: 0; margin-bottom: 16px; }
+  .b-list li {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 5px 0; font-size: 14px; color: var(--text2);
+  }
+  .b-list li::before { content: '→'; color: var(--accent); font-weight: 700; flex-shrink: 0; }
+
+  /* CODE */
+  code {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 4px;
+    padding: 2px 7px; font-family: var(--mono); font-size: 12px; color: var(--accent);
+  }
+  .code-block {
+    background: var(--text); color: #a8d8a8; border-radius: 10px; padding: 16px 20px;
+    font-family: var(--mono); font-size: 12px; line-height: 1.8; margin: 14px 0;
+    overflow-x: auto;
+  }
+  .code-block .c { color: #6a9fb5; }
+  .code-block .s { color: #f0c674; }
+  .code-block .k { color: #cc99cd; }
+
+  /* DATA FLOW TABLE */
+  .data-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+  .data-table th { background: var(--text); color: #fff; padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; }
+  .data-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text2); }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:nth-child(even) { background: var(--bg2); }
+  .data-table .col-name { font-weight: 600; color: var(--text); font-family: var(--mono); font-size: 12px; }
+  .data-table .col-type { color: var(--accent); font-family: var(--mono); font-size: 11px; }
+
+  /* PRIORITY BADGE */
+  .priority {
+    display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 20px;
+    font-size: 11px; font-weight: 700; font-family: var(--mono); letter-spacing: 0.05em;
+  }
+  .p1 { background: var(--red-light); color: var(--red); border: 1px solid rgba(185,28,28,0.15); }
+  .p2 { background: var(--amber-light); color: var(--amber); border: 1px solid rgba(146,64,14,0.15); }
+  .p3 { background: var(--green-light); color: var(--green); border: 1px solid rgba(4,120,87,0.15); }
+
+  /* PHASE CARDS */
+  .phase-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+  .phase-card {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px 20px; display: flex; gap: 16px; align-items: flex-start;
+  }
+  .phase-num {
+    width: 36px; height: 36px; border-radius: 8px; background: var(--accent);
+    color: #fff; font-weight: 700; font-family: var(--mono); font-size: 14px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .phase-content { flex: 1; }
+  .phase-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .phase-desc { font-size: 13px; color: var(--text2); line-height: 1.6; }
+  .phase-duration { font-size: 11px; font-weight: 600; color: var(--accent); font-family: var(--mono); margin-top: 6px; }
+
+  /* TECH STACK */
+  .tech-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 20px; }
+  @media(max-width:640px){ .tech-grid { grid-template-columns: 1fr 1fr; } }
+  .tech-card {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; text-align: center;
+  }
+  .tech-icon { font-size: 24px; margin-bottom: 6px; }
+  .tech-name { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .tech-role { font-size: 11px; color: var(--text3); }
+
+  /* PAGE FOOTER */
+  .doc-footer {
+    margin-top: 60px; padding-top: 24px; border-top: 1px solid var(--border);
+    text-align: center; font-size: 12px; color: var(--text3); font-family: var(--mono);
+  }
+
+  /* PRINT BUTTON */
+  .print-btn {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--accent); color: #fff; border: none; border-radius: 10px;
+    padding: 12px 20px; font-size: 13px; font-weight: 600; font-family: var(--sans);
+    cursor: pointer; box-shadow: 0 4px 20px rgba(26,86,219,0.3); transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .print-btn:hover { background: #1648c4; transform: translateY(-1px); }
+  @media print { .print-btn { display: none; } }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-mark">RE</div>
+    <div class="sidebar-title">Raj Electronics</div>
+    <div class="sidebar-sub">Product Requirements Document</div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Document</div>
+    <a class="sidebar-link active" href="#overview">1. Overview</a>
+    <a class="sidebar-link" href="#goals">2. Goals & Objectives</a>
+    <a class="sidebar-link" href="#users">3. User Roles</a>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Features</div>
+    <a class="sidebar-link" href="#auth">4. Authentication</a>
+    <a class="sidebar-link" href="#inward">5. Inward Stock</a>
+    <a class="sidebar-link" href="#outward">6. Outward Dispatch</a>
+    <a class="sidebar-link" href="#challan">7. Dispatch Challan</a>
+    <a class="sidebar-link" href="#inventory">8. Inventory</a>
+    <a class="sidebar-link" href="#admin">9. Admin Panel</a>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Technical</div>
+    <a class="sidebar-link" href="#data">10. Data Schema</a>
+    <a class="sidebar-link" href="#sheets">11. Google Sheets</a>
+    <a class="sidebar-link" href="#tech">12. Tech Stack</a>
+    <a class="sidebar-link" href="#nfr">13. Non-Functional</a>
+    <a class="sidebar-link" href="#phases">14. Phases</a>
+    <a class="sidebar-link" href="#prompt">15. Dev Prompt</a>
+  </div>
+</nav>
+
+<!-- CONTENT -->
+<div class="content">
+
+  <!-- COVER -->
+  <div class="cover">
+    <div class="cover-label">Product Requirements Document</div>
+    <div class="cover-title">Raj Electronics<br>Stock Tracker System</div>
+    <div class="cover-sub">End-to-end serial number tracking — inward to outward — with barcode scanning, GST challan printing, and Google Sheets cloud sync.</div>
+    <div class="cover-meta">
+      <div class="cover-meta-item"><div class="cover-meta-label">Version</div><div class="cover-meta-value">v2.0</div></div>
+      <div class="cover-meta-item"><div class="cover-meta-label">Prepared For</div><div class="cover-meta-value">Antigravity Agency</div></div>
+      <div class="cover-meta-item"><div class="cover-meta-label">Client</div><div class="cover-meta-value">Raj Electronics, Hyderabad</div></div>
+      <div class="cover-meta-item"><div class="cover-meta-label">Date</div><div class="cover-meta-value">March 2026</div></div>
+      <div class="cover-meta-item"><div class="cover-meta-label">Platform</div><div class="cover-meta-value">Web PWA + Android App</div></div>
+    </div>
+  </div>
+
+  <!-- 1. OVERVIEW -->
+  <div class="section" id="overview">
+    <span class="section-number">01 — OVERVIEW</span>
+    <h1>Product Overview</h1>
+    <p>Raj Electronics is a home appliances dealer based in Hyderabad dealing in brands such as Samsung, LG, Whirlpool, Haier, Voltas, and others. The business receives 2,000+ units per month across multiple godowns and dispatches them to retail customers and dealers.</p>
+    <p>Currently there is no system to track individual serial numbers from receipt to sale. This leads to inventory discrepancies, difficulty tracing sold units, and no audit trail for staff accountability.</p>
+    <p>This product is a <strong>Progressive Web App (PWA) + native Android app</strong> that gives Raj Electronics complete serial-number-level tracking from the moment a unit enters a godown to the moment it leaves, with a print-ready GST dispatch challan generated at the point of outward movement.</p>
+
+    <div class="callout callout-info">
+      <div class="callout-icon">💡</div>
+      <div class="callout-body">
+        <div class="callout-title">Single source of truth</div>
+        <p>Every scan — inward or outward — writes in real time to a structured Google Sheet that acts as the live database. The admin can open the Sheet at any time and see the exact status of every serial number in the business.</p>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- 2. GOALS -->
+  <div class="section" id="goals">
+    <span class="section-number">02 — GOALS & OBJECTIVES</span>
+    <h1>Goals & Objectives</h1>
+
+    <h2>Primary Goals</h2>
+    <ul class="num-list">
+      <li><div class="num-badge">1</div><div>Track every unit from inward receipt to outward dispatch using its unique serial number — no unit should be unaccounted for at any point.</div></li>
+      <li><div class="num-badge">2</div><div>Enable staff to scan serial numbers using the phone camera (barcode/QR) without manual typing errors, at the speed required for 2,000+ units/month.</div></li>
+      <li><div class="num-badge">3</div><div>Auto-generate a print-ready GST dispatch challan at the time of every outward movement containing all serial numbers, dealer details, and tax breakdown.</div></li>
+      <li><div class="num-badge">4</div><div>Maintain a live, searchable Google Sheet that the admin can access from any device at any time — no separate software, no local database dependency.</div></li>
+      <li><div class="num-badge">5</div><div>Enforce a strict role-based access system where staff can only perform inward and outward operations, and all other data remains admin-only.</div></li>
+    </ul>
+
+    <h2>Success Metrics</h2>
+    <ul class="b-list">
+      <li>100% of inward stock has a serial number entry before being placed in godown</li>
+      <li>Zero untracked outward movements — every dispatch has a challan</li>
+      <li>Admin can locate any serial number's current status in under 10 seconds</li>
+      <li>Staff can scan and log a batch of 20 units in under 3 minutes</li>
+      <li>System handles 2,000+ serial entries per month without performance degradation</li>
+    </ul>
+  </div>
+
+  <hr>
+
+  <!-- 3. USER ROLES -->
+  <div class="section" id="users">
+    <span class="section-number">03 — USER ROLES</span>
+    <h1>User Roles & Access</h1>
+    <p>The system has exactly two roles. There is no self-registration — all accounts are created by the admin.</p>
+
+    <div class="role-grid">
+      <div class="role-card role-admin">
+        <div class="role-badge">ADMIN</div>
+        <h3>Business Owner / Manager</h3>
+        <p style="font-size:13px;color:#1e3a8a;line-height:1.7;">Single admin account with a fixed username and password set at system setup. The admin has unrestricted access to all features, data, reports, and settings.</p>
+        <ul class="b-list" style="margin-top:10px;">
+          <li style="font-size:13px;color:#1e40af;">Creates and manages employee accounts</li>
+          <li style="font-size:13px;color:#1e40af;">Views full inventory and logs</li>
+          <li style="font-size:13px;color:#1e40af;">Exports reports and CSV data</li>
+          <li style="font-size:13px;color:#1e40af;">Configures godowns, GST, company info</li>
+          <li style="font-size:13px;color:#1e40af;">Views activity log of all staff actions</li>
+        </ul>
+      </div>
+      <div class="role-card role-employee">
+        <div class="role-badge">EMPLOYEE</div>
+        <h3>Warehouse / Dispatch Staff</h3>
+        <p style="font-size:13px;color:#065f46;line-height:1.7;">Employee IDs are generated by the admin. Each employee logs in with their ID and a password set by the admin. Employees see only the Inward and Outward tabs — nothing else.</p>
+        <ul class="b-list" style="margin-top:10px;">
+          <li style="font-size:13px;color:#047857;">Can submit inward stock entries</li>
+          <li style="font-size:13px;color:#047857;">Can submit outward dispatch entries</li>
+          <li style="font-size:13px;color:#047857;">Can print dispatch challan</li>
+          <li style="font-size:13px;color:#047857;">Cannot view inventory list or reports</li>
+          <li style="font-size:13px;color:#047857;">Cannot change settings or other data</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>Permission Matrix</h2>
+    <div style="overflow-x:auto;">
+    <table class="perm-table">
+      <thead>
+        <tr>
+          <th>Feature / Screen</th>
+          <th>Admin</th>
+          <th>Employee</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="feature-name">Dashboard (stats, recent activity)</td><td><span class="tick">✓</span></td><td><span class="cross">✗</span></td></tr>
+        <tr><td class="feature-name">Inward Stock Entry</td><td><span class="tick">✓</span></td><td><span class="tick">✓</span></td></tr>
+        <tr><td class="feature-name">Outward Dispatch Entry</td><td><span class="tick">✓</span></td><td><span class="tick">✓</span></td></tr>
+        <tr><td class="feature-name">Print Dispatch Challan</td><td><span class="tick">✓</span></td><td><span class="tick">✓</span></td></tr>
+        <tr><td class="feature-name">Full Inventory List (all serials)</td><td><span class="tick">✓</span></td><td><span class="cross">✗</span></td></tr>
+        <tr><td class="feature-name">Search by Serial Number</td><td><span class="tick">✓</span></td><td><span class="cross">✗</span></td></tr>
+        <tr><td class="feature-name">Export CSV / Reports</td><td><span class="tick">✓</span></td><td><span class="cross">✗</span></td></tr>
+        <tr><td class="feature-name">Staff Activity Log</td><td><span class="tick">✓</span></td><td><span class="cross">✗</span></td></tr>
+        <tr><td class="feature-name">Manage Employee Accounts</td><td><span class="tick">✓</span></td><td><span class="cross">✗</span></td></tr>
+        <tr><td class="feature-name">Company & GST Settings</td><td><span class="tick">✓</span></td><td><span class="cross">✗</span></td></tr>
+        <tr><td class="feature-name">Godown Management</td><td><span class="tick">✓</span></td><td><span class="cross">✗</span></td></tr>
+        <tr><td class="feature-name">Google Sheets Configuration</td><td><span class="tick">✓</span></td><td><span class="cross">✗</span></td></tr>
+        <tr><td class="feature-name">Google Sheets Sync (manual)</td><td><span class="tick">✓</span></td><td><span class="cross">✗</span></td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- 4. AUTH -->
+  <div class="section" id="auth">
+    <span class="section-number">04 — AUTHENTICATION</span>
+    <h1>Authentication System</h1>
+
+    <h2>Admin Login</h2>
+    <ul class="b-list">
+      <li>Single admin account — username and password configured at first-time setup</li>
+      <li>Login screen is the first screen of the app — no bypass allowed</li>
+      <li>Admin credentials stored securely (hashed password) — not in Google Sheets</li>
+      <li>Session persists for 8 hours then requires re-login</li>
+      <li>Admin can change their own password from Settings</li>
+    </ul>
+
+    <h2>Employee Account Management</h2>
+    <ul class="b-list">
+      <li>Admin creates employee accounts from the Admin Panel → Staff Management tab</li>
+      <li>System auto-generates a unique Employee ID in format: <code>RE-YYYY-XXXX</code> (e.g. <code>RE-2024-0047</code>)</li>
+      <li>Admin sets a password for each employee at creation time</li>
+      <li>Admin can deactivate or delete any employee account instantly</li>
+      <li>Deactivated employees are immediately logged out and blocked from re-entry</li>
+      <li>Employee passwords can be reset by admin at any time</li>
+      <li>Employees cannot change their own password — admin controls this</li>
+    </ul>
+
+    <h2>Login Screen Requirements</h2>
+    <ul class="b-list">
+      <li>Single unified login screen for both admin and employees</li>
+      <li>Fields: Employee/Admin ID, Password</li>
+      <li>On login, role is detected automatically — admin sees full app, employee sees restricted view</li>
+      <li>Failed login after 5 attempts locks the account for 15 minutes</li>
+      <li>No "forgot password" for employees — admin resets it</li>
+    </ul>
+
+    <div class="callout callout-warn">
+      <div class="callout-icon">⚠️</div>
+      <div class="callout-body">
+        <div class="callout-title">No self-registration</div>
+        <p>There must be no "Sign up" or "Create account" option visible anywhere in the app. All accounts are admin-created only. The login screen should only show ID and password fields.</p>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- 5. INWARD -->
+  <div class="section" id="inward">
+    <span class="section-number">05 — INWARD STOCK</span>
+    <h1>Inward Stock Entry</h1>
+    <p>Used when stock arrives from a supplier and is being received into a godown. This creates a new record for every serial number in the system with status <code>IN STOCK</code>.</p>
+
+    <h2>Form Fields (all required unless marked optional)</h2>
+    <div style="overflow-x:auto;">
+    <table class="data-table">
+      <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="col-name">Date</td><td class="col-type">date</td><td>Defaults to today. Editable.</td></tr>
+        <tr><td class="col-name">Godown / Location</td><td class="col-type">text + autocomplete</td><td>From admin-configured godown list. Free-type also allowed.</td></tr>
+        <tr><td class="col-name">Brand</td><td class="col-type">text + autocomplete</td><td>Autocomplete from common brands. Free-type allowed.</td></tr>
+        <tr><td class="col-name">Model Number</td><td class="col-type">text</td><td>Exact model code e.g. WA70T4262GG</td></tr>
+        <tr><td class="col-name">Product Category</td><td class="col-type">dropdown</td><td>Refrigerator, Washing Machine, AC, TV, Microwave, Water Purifier, Other</td></tr>
+        <tr><td class="col-name">HSN Code</td><td class="col-type">text</td><td>Optional. Stored per unit for challan printing.</td></tr>
+        <tr><td class="col-name">Unloaded By</td><td class="col-type">text</td><td>Staff name. Auto-filled with logged-in user's name.</td></tr>
+        <tr><td class="col-name">Supplier / Invoice Ref</td><td class="col-type">text</td><td>Optional. Supplier name or purchase invoice number.</td></tr>
+        <tr><td class="col-name">Serial Numbers</td><td class="col-type">scan + manual</td><td>Multiple serials. Each scanned or typed individually. See scanner spec below.</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h2>Scanner Behaviour</h2>
+    <ul class="b-list">
+      <li>Camera opens using device rear camera via browser/app barcode API</li>
+      <li>Supports standard barcodes (Code 128, Code 39, EAN-13) and QR codes</li>
+      <li>Each successful scan adds the serial as a chip/tag on screen with a remove button</li>
+      <li>Duplicate serial within the same entry triggers a warning toast — not added twice</li>
+      <li>Manual text input fallback: type serial and press Enter to add</li>
+      <li>Camera stays open between scans — staff does not need to re-open after each unit</li>
+      <li>Scan count shown live: <code>14 serial numbers added</code></li>
+    </ul>
+
+    <h2>On Save</h2>
+    <ul class="b-list">
+      <li>Each serial number creates one row in the Inventory sheet with status <code>IN STOCK</code></li>
+      <li>One row created in the Inward Log sheet per serial number</li>
+      <li>If a serial number already exists in inventory, show error and skip that serial — do not overwrite</li>
+      <li>Success toast shows count: <code>✓ 18 items saved to inventory</code></li>
+      <li>Form clears after successful save. Date resets to today.</li>
+    </ul>
+  </div>
+
+  <hr>
+
+  <!-- 6. OUTWARD -->
+  <div class="section" id="outward">
+    <span class="section-number">06 — OUTWARD DISPATCH</span>
+    <h1>Outward Dispatch Entry</h1>
+    <p>Used when stock leaves the godown — either sold to a retail customer or transferred to a dealer. This updates each serial's status and triggers the dispatch challan.</p>
+
+    <h2>Form Fields</h2>
+    <div style="overflow-x:auto;">
+    <table class="data-table">
+      <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="col-name">Dispatch Date</td><td class="col-type">date</td><td>Defaults to today.</td></tr>
+        <tr><td class="col-name">Challan / Invoice No.</td><td class="col-type">text</td><td>Auto-generated in format <code>DC-YYYY-XXXX</code>. Editable by admin.</td></tr>
+        <tr><td class="col-name">Buyer / Dealer Name</td><td class="col-type">text</td><td>Full name of customer or dealer.</td></tr>
+        <tr><td class="col-name">Buyer Address</td><td class="col-type">textarea</td><td>Full address — printed on challan.</td></tr>
+        <tr><td class="col-name">Buyer GSTIN</td><td class="col-type">text</td><td>Optional. Printed on challan if provided.</td></tr>
+        <tr><td class="col-name">Sale Type</td><td class="col-type">dropdown</td><td>Retail Sale / Dealer Transfer / Service Return / Replacement</td></tr>
+        <tr><td class="col-name">Mode of Transport</td><td class="col-type">dropdown</td><td>Own Vehicle / Dealer Pickup / Courier / Hand Delivery</td></tr>
+        <tr><td class="col-name">Handed Over By</td><td class="col-type">text</td><td>Auto-filled with logged-in user's name.</td></tr>
+        <tr><td class="col-name">GST Rate</td><td class="col-type">dropdown</td><td>0%, 5%, 12%, 18%, 28%</td></tr>
+        <tr><td class="col-name">Price per Unit (ex-GST)</td><td class="col-type">number</td><td>Optional. If entered, GST summary is calculated and shown on challan.</td></tr>
+        <tr><td class="col-name">Remarks</td><td class="col-type">text</td><td>Optional. Printed on challan.</td></tr>
+        <tr><td class="col-name">Serial Numbers</td><td class="col-type">scan + manual</td><td>Each serial is verified against inventory before being accepted.</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h2>Serial Verification Rules</h2>
+    <ul class="b-list">
+      <li>If scanned serial is <strong>not found</strong> in inventory → error: <em>"Serial not in inventory"</em> — not added</li>
+      <li>If scanned serial is found but status is <strong>not IN STOCK</strong> → error: <em>"Already dispatched"</em> — not added</li>
+      <li>Only serials with status <code>IN STOCK</code> can be added to an outward entry</li>
+      <li>On confirm dispatch, each serial's status updates to <code>SOLD</code> or <code>DISPATCHED</code></li>
+    </ul>
+
+    <h2>Action Buttons</h2>
+    <ul class="b-list">
+      <li><strong>Preview & Print Challan</strong> — opens challan modal with live data. Can be tapped before or after confirming dispatch.</li>
+      <li><strong>Confirm Dispatch</strong> — saves dispatch, updates all serial statuses, writes to Google Sheets.</li>
+    </ul>
+  </div>
+
+  <hr>
+
+  <!-- 7. CHALLAN -->
+  <div class="section" id="challan">
+    <span class="section-number">07 — DISPATCH CHALLAN</span>
+    <h1>Dispatch Challan (Print)</h1>
+    <p>A print-ready A4 document generated at the time of outward dispatch. Staff can preview it in a modal and then print or save as PDF via the browser/app print dialog.</p>
+
+    <h2>Challan Contents</h2>
+    <ul class="b-list">
+      <li><strong>Header:</strong> Company name, address, GSTIN, phone number (from Settings)</li>
+      <li><strong>Challan number</strong> and date — top right</li>
+      <li><strong>Dispatched To block:</strong> Buyer name, full address, buyer GSTIN</li>
+      <li><strong>Details block:</strong> Date, transport mode, handed over by, total item count</li>
+      <li><strong>Items table:</strong> Sr. No. | Serial Number | Brand | Model No. | Category | HSN Code</li>
+      <li><strong>Total row:</strong> Total items count at bottom of table</li>
+      <li><strong>GST Summary table</strong> (if price entered): Taxable value, CGST %, SGST %, Grand Total</li>
+      <li><strong>Remarks</strong> section</li>
+      <li><strong>Authorised Signatory</strong> box with staff name + receiver signature box</li>
+      <li><strong>Footer:</strong> Computer-generated disclaimer + company watermark</li>
+    </ul>
+
+    <h2>Print Behaviour</h2>
+    <ul class="b-list">
+      <li>When print is triggered, only the challan is sent to the printer — all app UI is hidden</li>
+      <li>Formatted for A4 paper with 10mm margins</li>
+      <li>"Save as PDF" works via standard browser print dialog — no extra software needed</li>
+      <li>Challan is also accessible from the Outward Log in the admin panel (reprint previous challans)</li>
+    </ul>
+
+    <div class="callout callout-success">
+      <div class="callout-icon">✅</div>
+      <div class="callout-body">
+        <div class="callout-title">Light theme for print</div>
+        <p>The challan prints on a white background with black text regardless of the app theme. It must be professional and clean — no dark backgrounds, no colored fills on the main body.</p>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- 8. INVENTORY -->
+  <div class="section" id="inventory">
+    <span class="section-number">08 — INVENTORY (ADMIN ONLY)</span>
+    <h1>Inventory Management</h1>
+    <p>Admin-only view. Shows every serial number ever entered into the system with full details and current status.</p>
+
+    <h2>Inventory Table Columns</h2>
+    <ul class="b-list">
+      <li>Serial Number · Brand · Model · Category · Status · Date In · Godown · Staff In · Supplier · Buyer · Date Out · Invoice No.</li>
+    </ul>
+
+    <h2>Search & Filter</h2>
+    <ul class="b-list">
+      <li>Global search: serial number, brand, model, godown, buyer name</li>
+      <li>Filter by status: All / IN STOCK / SOLD / DISPATCHED</li>
+      <li>Filter by date range (date in or date out)</li>
+      <li>Filter by godown</li>
+      <li>Filter by brand</li>
+    </ul>
+
+    <h2>Export Options</h2>
+    <ul class="b-list">
+      <li>Export full inventory as CSV — includes all columns</li>
+      <li>Export filtered results only</li>
+      <li>Copy to clipboard (tab-separated for direct Google Sheets paste)</li>
+    </ul>
+  </div>
+
+  <hr>
+
+  <!-- 9. ADMIN PANEL -->
+  <div class="section" id="admin">
+    <span class="section-number">09 — ADMIN PANEL</span>
+    <h1>Admin Panel Features</h1>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-card-icon">📊</div>
+        <div class="feature-card-title">Dashboard</div>
+        <div class="feature-card-desc">Total in stock, sold, dispatched, this month's inward count. Recent activity feed. Quick stats by brand and godown.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon">👥</div>
+        <div class="feature-card-title">Staff Management</div>
+        <div class="feature-card-desc">Create employee accounts with auto-generated IDs. Set/reset passwords. Activate or deactivate accounts. View last login per employee.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon">📋</div>
+        <div class="feature-card-title">Activity Log</div>
+        <div class="feature-card-desc">Full audit trail of every action — who did what, when, how many serials, which godown. Filterable by employee, date, action type.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon">📤</div>
+        <div class="feature-card-title">Outward Log</div>
+        <div class="feature-card-desc">Full history of all dispatch entries. Click any entry to reprint its challan. Filter by dealer, date, staff member.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon">📥</div>
+        <div class="feature-card-title">Inward Log</div>
+        <div class="feature-card-desc">Full history of all inward entries. Filter by supplier, godown, staff, date. Click to see all serials in that batch.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon">⚙️</div>
+        <div class="feature-card-title">Settings</div>
+        <div class="feature-card-desc">Company name, address, GSTIN, phone for challan header. Godown list management. Google Sheets API key + Sheet ID. Admin password change.</div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- 10. DATA SCHEMA -->
+  <div class="section" id="data">
+    <span class="section-number">10 — DATA SCHEMA</span>
+    <h1>Google Sheets Data Schema</h1>
+    <p>The Google Sheet has 4 tabs. Tab names must be exact — the app uses these names to read/write via the Sheets API.</p>
+
+    <h2>Tab 1: Inventory</h2>
+    <div style="overflow-x:auto;">
+    <table class="data-table">
+      <thead><tr><th>Column</th><th>Header (exact)</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td class="col-type">A</td><td class="col-name">Serial No</td><td>Unique serial number of the unit</td></tr>
+        <tr><td class="col-type">B</td><td class="col-name">Brand</td><td>e.g. Samsung, LG</td></tr>
+        <tr><td class="col-type">C</td><td class="col-name">Model</td><td>Model number</td></tr>
+        <tr><td class="col-type">D</td><td class="col-name">Category</td><td>Washing Machine, Refrigerator, etc.</td></tr>
+        <tr><td class="col-type">E</td><td class="col-name">HSN Code</td><td>HSN for GST purposes</td></tr>
+        <tr><td class="col-type">F</td><td class="col-name">Status</td><td>IN STOCK / SOLD / DISPATCHED</td></tr>
+        <tr><td class="col-type">G</td><td class="col-name">Date In</td><td>YYYY-MM-DD format</td></tr>
+        <tr><td class="col-type">H</td><td class="col-name">Godown</td><td>Location where received</td></tr>
+        <tr><td class="col-type">I</td><td class="col-name">Staff In</td><td>Employee who logged inward</td></tr>
+        <tr><td class="col-type">J</td><td class="col-name">Supplier</td><td>Supplier name / purchase invoice ref</td></tr>
+        <tr><td class="col-type">K</td><td class="col-name">Buyer</td><td>Buyer/dealer name on dispatch</td></tr>
+        <tr><td class="col-type">L</td><td class="col-name">Date Out</td><td>YYYY-MM-DD format</td></tr>
+        <tr><td class="col-type">M</td><td class="col-name">Invoice No</td><td>Dispatch challan number</td></tr>
+        <tr><td class="col-type">N</td><td class="col-name">Handed By</td><td>Staff who handled dispatch</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h2>Tab 2: Inward Log</h2>
+    <p>One row per serial number per inward batch. Columns: Entry Date, Serial No, Brand, Model, Category, HSN, Godown, Staff Name, Supplier, Timestamp (ISO).</p>
+
+    <h2>Tab 3: Outward Log</h2>
+    <p>One row per serial number per outward dispatch. Columns: Dispatch Date, Serial No, Brand, Model, Buyer, Dealer Address, GSTIN, Invoice No, Sale Type, Transport, Handed By, Price, GST Rate, Timestamp (ISO).</p>
+
+    <h2>Tab 4: Staff Log</h2>
+    <p>Audit trail. Columns: Timestamp, Employee ID, Employee Name, Action (INWARD/OUTWARD), Batch Size, Godown, Notes.</p>
+  </div>
+
+  <hr>
+
+  <!-- 11. GOOGLE SHEETS -->
+  <div class="section" id="sheets">
+    <span class="section-number">11 — GOOGLE SHEETS INTEGRATION</span>
+    <h1>Google Sheets Sync</h1>
+
+    <h2>Write Operations</h2>
+    <ul class="b-list">
+      <li>Every inward save appends rows to Inventory tab and Inward Log tab via Sheets API v4</li>
+      <li>Every outward save updates existing rows in Inventory tab (status, buyer, date out) and appends to Outward Log</li>
+      <li>Every action appends to Staff Log tab</li>
+      <li>Writes happen asynchronously after the local save — app does not block on network</li>
+      <li>If write fails (no internet), entry is queued locally and retried automatically when connection resumes</li>
+    </ul>
+
+    <h2>Read Operations</h2>
+    <ul class="b-list">
+      <li>App primarily reads from local storage (IndexedDB or localStorage) for speed</li>
+      <li>On app load, admin can trigger a full sync from Sheets to overwrite local data</li>
+      <li>Serial number lookup (to verify in-stock status on outward scan) reads from local data only — must be fast</li>
+    </ul>
+
+    <h2>Auth Method</h2>
+    <ul class="b-list">
+      <li>Use Google Sheets API v4 with a service account JSON key (recommended for write access without user OAuth)</li>
+      <li>The service account email is added as an Editor to the Google Sheet</li>
+      <li>Alternatively: OAuth2 with the admin's Google account — admin logs in once and grants access</li>
+      <li>API key alone (read-only) is insufficient — write access requires service account or OAuth</li>
+    </ul>
+  </div>
+
+  <hr>
+
+  <!-- 12. TECH STACK -->
+  <div class="section" id="tech">
+    <span class="section-number">12 — TECH STACK</span>
+    <h1>Recommended Tech Stack</h1>
+
+    <div class="tech-grid">
+      <div class="tech-card"><div class="tech-icon">⚛️</div><div class="tech-name">React or Vanilla JS</div><div class="tech-role">Frontend PWA</div></div>
+      <div class="tech-card"><div class="tech-icon">📱</div><div class="tech-name">Android WebView</div><div class="tech-role">Android App Wrapper</div></div>
+      <div class="tech-card"><div class="tech-icon">🔍</div><div class="tech-name">ZXing / QuaggaJS</div><div class="tech-role">Barcode Scanner</div></div>
+      <div class="tech-card"><div class="tech-icon">☁️</div><div class="tech-name">Google Sheets API v4</div><div class="tech-role">Cloud Database</div></div>
+      <div class="tech-card"><div class="tech-icon">🔐</div><div class="tech-name">Firebase Auth</div><div class="tech-role">Login & Sessions</div></div>
+      <div class="tech-card"><div class="tech-icon">💾</div><div class="tech-name">IndexedDB / Supabase</div><div class="tech-role">Local / Backup DB</div></div>
+      <div class="tech-card"><div class="tech-icon">🖨️</div><div class="tech-name">Browser Print API</div><div class="tech-role">Challan PDF</div></div>
+      <div class="tech-card"><div class="tech-icon">🚀</div><div class="tech-name">Vercel / Netlify</div><div class="tech-role">Hosting (free tier)</div></div>
+      <div class="tech-card"><div class="tech-icon">🤖</div><div class="tech-name">Android Studio</div><div class="tech-role">APK Build</div></div>
+    </div>
+
+    <div class="callout callout-info">
+      <div class="callout-icon">📱</div>
+      <div class="callout-body">
+        <div class="callout-title">Android App Strategy</div>
+        <p>Build the PWA first. Wrap it in a WebView-based Android app using Android Studio. The same codebase powers both — this avoids maintaining two separate codebases and keeps cost low. Native features needed: camera access (WebView supports this), and an APK for Play Store or direct APK install.</p>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- 13. NFR -->
+  <div class="section" id="nfr">
+    <span class="section-number">13 — NON-FUNCTIONAL REQUIREMENTS</span>
+    <h1>Non-Functional Requirements</h1>
+
+    <h2>Performance</h2>
+    <ul class="b-list">
+      <li>App must load in under 3 seconds on a mid-range Android phone on 4G</li>
+      <li>Serial number verification (in-stock check) must respond in under 200ms — reads from local data only</li>
+      <li>Camera scanner must start in under 2 seconds after tap</li>
+      <li>Handles 50,000+ inventory rows without table lag</li>
+    </ul>
+
+    <h2>Offline Support</h2>
+    <ul class="b-list">
+      <li>Inward and outward forms must work fully offline — data saves locally first</li>
+      <li>Unsynced entries are clearly marked with a sync-pending indicator</li>
+      <li>Auto-sync when network is restored — no manual intervention required</li>
+      <li>Admin dashboard requires network to show live Google Sheets data</li>
+    </ul>
+
+    <h2>Design — Light Theme</h2>
+    <ul class="b-list">
+      <li>White/light grey background throughout — no dark mode for warehouse use (bright screens easier to read in godown lighting)</li>
+      <li>Primary accent colour: deep blue (<code>#1a56db</code>) for buttons and highlights</li>
+      <li>Status colours: Green = IN STOCK, Red = SOLD, Amber = DISPATCHED</li>
+      <li>Clean, high-contrast typography — minimum 14px body text for readability on phones</li>
+      <li>Tap targets minimum 44×44px — staff will be using gloves or handling units while tapping</li>
+    </ul>
+
+    <h2>Security</h2>
+    <ul class="b-list">
+      <li>All API keys stored server-side or in environment variables — never in client-side JS</li>
+      <li>Employee sessions expire after 8 hours of inactivity</li>
+      <li>Employee can only access data endpoints relevant to their permitted actions</li>
+      <li>Google Sheets service account key never exposed to the browser</li>
+    </ul>
+
+    <h2>Compatibility</h2>
+    <ul class="b-list">
+      <li>Chrome on Android (primary) — must be fully functional</li>
+      <li>Safari on iOS — must work for inward/outward scanning</li>
+      <li>Desktop Chrome — admin panel fully functional</li>
+      <li>Android APK targets API level 26+ (Android 8.0 and above)</li>
+    </ul>
+  </div>
+
+  <hr>
+
+  <!-- 14. PHASES -->
+  <div class="section" id="phases">
+    <span class="section-number">14 — DELIVERY PHASES</span>
+    <h1>Suggested Delivery Phases</h1>
+
+    <div class="phase-list">
+      <div class="phase-card">
+        <div class="phase-num">1</div>
+        <div class="phase-content">
+          <div class="phase-title">Auth + Inward + Outward + Challan (Core)</div>
+          <div class="phase-desc">Login screen with admin and employee roles. Employee-restricted view. Inward stock entry with camera scanner. Outward dispatch with serial verification. Dispatch challan modal + print. Local data storage. Google Sheets write on every save.</div>
+          <div class="phase-duration">Priority: P1 — Must have for go-live</div>
+        </div>
+      </div>
+      <div class="phase-card">
+        <div class="phase-num">2</div>
+        <div class="phase-content">
+          <div class="phase-title">Admin Panel + Inventory + Staff Management</div>
+          <div class="phase-desc">Full inventory search table. Admin dashboard with stats. Staff account creation + employee ID generation. Inward and outward log history with reprint challan. Activity/audit log.</div>
+          <div class="phase-duration">Priority: P1 — Required for admin operations</div>
+        </div>
+      </div>
+      <div class="phase-card">
+        <div class="phase-num">3</div>
+        <div class="phase-content">
+          <div class="phase-title">Android APK</div>
+          <div class="phase-desc">Wrap PWA in Android WebView. Configure camera permissions. Build debug APK for testing. Build signed release APK for distribution (direct install or Play Store).</div>
+          <div class="phase-duration">Priority: P2 — Strongly recommended for field staff</div>
+        </div>
+      </div>
+      <div class="phase-card">
+        <div class="phase-num">4</div>
+        <div class="phase-content">
+          <div class="phase-title">Offline Sync Queue + Advanced Reports</div>
+          <div class="phase-desc">Reliable offline queue with auto-retry. Stock ageing report (units in godown > 30/60/90 days). Brand-wise and model-wise stock report. Export filtered reports to CSV/PDF.</div>
+          <div class="phase-duration">Priority: P3 — Nice to have post-launch</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- 15. DEV PROMPT -->
+  <div class="section" id="prompt">
+    <span class="section-number">15 — DEVELOPER PROMPT</span>
+    <h1>Prompt for Development Team</h1>
+    <p>Copy and share this prompt directly with your development team or AI coding assistant as the starting brief.</p>
+
+    <div class="code-block">
+<span class="c">// ═══════════════════════════════════════════════════════════════</span>
+<span class="c">// RAJ ELECTRONICS — STOCK TRACKER SYSTEM</span>
+<span class="c">// Full-stack PWA + Android App — Developer Brief</span>
+<span class="c">// ═══════════════════════════════════════════════════════════════</span>
+
+Build a <span class="s">Progressive Web App (PWA) + Android APK</span> for Raj Electronics,
+a home appliances dealer in Hyderabad, India, handling 2000+ units/month.
+
+<span class="k">CORE PURPOSE:</span>
+Track every product unit from inward receipt to outward dispatch using its
+serial number. Every unit has one serial number. Every serial number has a
+complete lifecycle: IN STOCK → SOLD or DISPATCHED.
+
+<span class="k">DESIGN THEME:</span>
+Light theme throughout. White/light grey backgrounds. Deep blue (#1a56db)
+as primary accent. Clean Inter or similar sans-serif font. Minimum 14px body
+text. 44px minimum tap targets. Professional, warehouse-friendly UI.
+
+<span class="k">AUTH — TWO ROLES ONLY:</span>
+1. ADMIN — single account, full access to everything.
+   Username/password configured at setup. Can change own password.
+2. EMPLOYEE — accounts created by admin only. Auto-generated ID format:
+   RE-YYYY-XXXX. Admin sets password. Employee sees ONLY Inward and
+   Outward tabs. All other screens — inventory, reports, settings, staff
+   management — are completely hidden and inaccessible to employees.
+   No self-registration anywhere. No forgot password for employees.
+   Lock account after 5 failed login attempts for 15 minutes.
+
+<span class="k">INWARD STOCK ENTRY (admin + employee):</span>
+Fields: Date, Godown (autocomplete from admin list), Brand (autocomplete),
+Model Number, Category (dropdown), HSN Code (optional), Unloaded By
+(auto-fills logged-in user name), Supplier/Invoice Ref (optional).
+Serial Numbers: scan via device rear camera (ZXing/QuaggaJS) + manual
+text input. Each scan adds a chip on screen. Duplicates rejected with toast.
+Camera stays open between scans. On save: each serial → new row in Inventory
+tab (status = IN STOCK) + row in Inward Log tab in Google Sheets.
+If serial already exists in inventory, show error and skip — do not overwrite.
+
+<span class="k">OUTWARD DISPATCH ENTRY (admin + employee):</span>
+Fields: Dispatch Date, Challan/Invoice No (auto-generated DC-YYYY-XXXX,
+editable), Buyer/Dealer Name, Buyer Address, Buyer GSTIN (optional),
+Sale Type (Retail Sale/Dealer Transfer/Service Return/Replacement),
+Mode of Transport, Handed Over By (auto-fills logged-in user), GST Rate
+(0/5/12/18/28%), Price per Unit ex-GST (optional), Remarks.
+Serial scan: each scanned serial is verified — must exist in inventory with
+status IN STOCK. If not found → error toast. If already dispatched → error.
+Live GST calc: as serials are scanned + price entered, show Taxable Value,
+CGST, SGST, Grand Total.
+Two buttons: "Preview & Print Challan" (opens modal, works before OR after
+confirm) and "Confirm Dispatch" (saves, updates serial statuses).
+
+<span class="k">DISPATCH CHALLAN (modal + print):</span>
+A4 print-ready document. Triggered from Outward tab.
+Contents: Company header (name/address/GSTIN/phone from settings),
+Challan number + date, Dispatched To (buyer name/address/GSTIN),
+Details block (date/transport/handed by/total items), Items table
+(Sr No / Serial Number / Brand / Model / Category / HSN), Total row,
+GST Summary table (if price entered: taxable/CGST/SGST/grand total),
+Remarks, Authorised signatory + receiver signature boxes, watermark footer.
+Print behaviour: @media print hides all app UI, shows only challan.
+A4 format, 10mm margins. White background, black text always.
+Admin can reprint any previous challan from Outward Log.
+
+<span class="k">ADMIN PANEL (admin only):</span>
+- Dashboard: stats (in stock / sold / dispatched / this month), recent activity
+- Inventory: full searchable/filterable table of all serials, export CSV
+- Inward Log: history of all inward batches, click to see serials in batch
+- Outward Log: history of all dispatches, click to reprint challan
+- Staff Management: create employee (auto-generate RE-YYYY-XXXX ID),
+  set password, activate/deactivate, view last login
+- Activity Log: full audit trail (who / what / when / how many / which godown)
+- Settings: company name/address/GSTIN/phone, godown list, Sheets config,
+  admin password change
+
+<span class="k">GOOGLE SHEETS (3 write tabs + 1 audit):</span>
+Tab names (exact): "Inventory", "Inward Log", "Outward Log", "Staff Log"
+Auth: Google service account JSON key (stored server-side, never in browser).
+Writes happen async after local save. If offline, queue locally, auto-retry.
+Inventory tab columns: Serial No / Brand / Model / Category / HSN / Status /
+Date In / Godown / Staff In / Supplier / Buyer / Date Out / Invoice No / Handed By
+Write on every inward: append to Inventory + Inward Log.
+Write on every outward: update rows in Inventory + append to Outward Log.
+Every action: append to Staff Log with employee ID, action type, timestamp.
+
+<span class="k">ANDROID APK:</span>
+Wrap PWA in Android WebView (Android Studio). Camera permissions configured.
+Target API 26+ (Android 8.0+). Build signed release APK for direct distribution.
+
+<span class="k">PERFORMANCE + OFFLINE:</span>
+Serial verification on outward scan reads local data only — must be under 200ms.
+Inward and outward forms work fully offline (IndexedDB local storage).
+App loads under 3s on mid-range Android on 4G.
+50,000+ inventory rows supported without lag.
+
+<span class="k">SECURITY:</span>
+All Google API keys and service account JSON stored server-side only.
+Employee sessions expire after 8 hours. Employee API calls restricted
+server-side to inward/outward endpoints only — role enforced on backend,
+not just frontend.
+    </div>
+
+    <div class="callout callout-success">
+      <div class="callout-icon">✅</div>
+      <div class="callout-body">
+        <div class="callout-title">Ready to hand off</div>
+        <p>Copy the prompt above and this entire PRD document and share with the Antigravity team. The prompt above is the condensed brief. This full document is the reference specification they should work from.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="doc-footer">
+    RAJ ELECTRONICS · STOCK TRACKER PRD v2.0 · CONFIDENTIAL · MARCH 2026
+  </div>
+
+</div>
+</div>
+
+<button class="print-btn" onclick="window.print()">🖨 Print / Save PDF</button>
+
+<script>
+// Highlight active sidebar link on scroll
+const sections = document.querySelectorAll('.section[id]');
+const links = document.querySelectorAll('.sidebar-link');
+window.addEventListener('scroll', () => {
+  let current = '';
+  sections.forEach(s => { if (window.scrollY >= s.offsetTop - 80) current = s.id; });
+  links.forEach(l => {
+    l.classList.remove('active');
+    if (l.getAttribute('href') === '#' + current) l.classList.add('active');
+  });
+});
+// Smooth scroll
+links.forEach(l => {
+  l.addEventListener('click', e => {
+    e.preventDefault();
+    const id = l.getAttribute('href').slice(1);
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+</script>
+</body>
+</html>

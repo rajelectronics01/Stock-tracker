@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Raj Electronics — Project Brief</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #faf9f6;
+    --card: #ffffff;
+    --border: #e8e4dc;
+    --text: #1a1612;
+    --text2: #5c5449;
+    --text3: #9c9488;
+    --accent: #1a56db;
+    --accent-light: #eef2fd;
+    --ink: #2c2518;
+    --sans: 'Inter', sans-serif;
+    --serif: 'Lora', Georgia, serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--serif);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  @media print {
+    body { background: #fff; }
+    .no-print { display: none !important; }
+    .page { box-shadow: none !important; border: none !important; }
+    @page { margin: 18mm; size: A4; }
+  }
+
+  .page {
+    max-width: 720px;
+    margin: 48px auto;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-shadow: 0 2px 40px rgba(0,0,0,0.06);
+    overflow: hidden;
+  }
+
+  /* LETTERHEAD */
+  .letterhead {
+    background: var(--ink);
+    padding: 40px 56px 36px;
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 24px;
+  }
+  .lh-left { }
+  .lh-from {
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 8px;
+  }
+  .lh-company {
+    font-family: var(--serif);
+    font-size: 24px;
+    font-weight: 600;
+    color: #fff;
+    line-height: 1.2;
+    margin-bottom: 4px;
+  }
+  .lh-city {
+    font-family: var(--sans);
+    font-size: 12px;
+    color: rgba(255,255,255,0.45);
+  }
+  .lh-right { text-align: right; flex-shrink: 0; }
+  .lh-to-label {
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 6px;
+  }
+  .lh-to {
+    font-family: var(--serif);
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 3px;
+  }
+  .lh-date {
+    font-family: var(--sans);
+    font-size: 11px;
+    color: rgba(255,255,255,0.4);
+  }
+
+  /* SUBJECT LINE */
+  .subject-line {
+    background: var(--accent);
+    padding: 14px 56px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #fff;
+  }
+
+  /* BODY */
+  .body {
+    padding: 52px 56px 48px;
+  }
+
+  .salutation {
+    font-family: var(--serif);
+    font-size: 17px;
+    color: var(--text2);
+    margin-bottom: 32px;
+  }
+
+  p {
+    font-family: var(--serif);
+    font-size: 16px;
+    line-height: 1.85;
+    color: var(--text2);
+    margin-bottom: 22px;
+  }
+  p strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  p em {
+    color: var(--text2);
+    font-style: italic;
+  }
+
+  /* PULL QUOTE */
+  .pull {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-light);
+    padding: 18px 22px;
+    margin: 28px 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .pull p {
+    font-family: var(--serif);
+    font-size: 15px;
+    font-style: italic;
+    color: #1e3a8a;
+    margin: 0;
+    line-height: 1.7;
+  }
+
+  /* SECTION BREAK */
+  .section-break {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 36px 0 28px;
+  }
+  .section-break-line { flex: 1; height: 1px; background: var(--border); }
+  .section-break-label {
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text3);
+    white-space: nowrap;
+  }
+
+  /* INLINE HIGHLIGHT */
+  mark {
+    background: #fef9c3;
+    color: var(--ink);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-style: normal;
+  }
+
+  /* CLOSING */
+  .closing {
+    margin-top: 40px;
+    padding-top: 28px;
+    border-top: 1px solid var(--border);
+  }
+  .closing-line {
+    font-family: var(--serif);
+    font-size: 16px;
+    color: var(--text2);
+    margin-bottom: 32px;
+    line-height: 1.7;
+  }
+  .sig-name {
+    font-family: var(--serif);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 3px;
+  }
+  .sig-title {
+    font-family: var(--sans);
+    font-size: 12px;
+    color: var(--text3);
+    letter-spacing: 0.05em;
+  }
+
+  /* FOOTER */
+  .footer {
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    padding: 18px 56px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .footer-note {
+    font-family: var(--sans);
+    font-size: 11px;
+    color: var(--text3);
+  }
+  .footer-ref {
+    font-family: var(--sans);
+    font-size: 11px;
+    color: var(--text3);
+    font-weight: 500;
+  }
+
+  /* PRINT BTN */
+  .print-btn {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    background: var(--ink);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: var(--sans);
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .print-btn:hover { background: #3d3020; transform: translateY(-1px); }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- LETTERHEAD -->
+  <div class="letterhead">
+    <div class="lh-left">
+      <div class="lh-from">Project Brief From</div>
+      <div class="lh-company">Raj Electronics</div>
+      <div class="lh-city">Hyderabad, Telangana</div>
+    </div>
+    <div class="lh-right">
+      <div class="lh-to-label">Addressed To</div>
+      <div class="lh-to">Antigravity</div>
+      <div class="lh-date">March 2026</div>
+    </div>
+  </div>
+
+  <!-- SUBJECT -->
+  <div class="subject-line">
+    Re: Stock Tracking System — Serial Number Management, Barcode Scanning & GST Dispatch Challan
+  </div>
+
+  <!-- BODY -->
+  <div class="body">
+
+    <div class="salutation">Dear Antigravity Team,</div>
+
+    <p>
+      I run <strong>Raj Electronics</strong>, a home appliances dealership based out of Hyderabad. We deal in brands like Samsung, LG, Whirlpool, Haier, Voltas, Daikin, and more — receiving and dispatching <strong>over two thousand units every single month</strong> across multiple godowns and outlets. And right now, we have absolutely no system to track where each unit is, who handled it, or where it went.
+    </p>
+
+    <p>
+      I want to fix that completely. What I need is a <strong>web app and an Android application</strong> that gives us end-to-end visibility over every single product — from the moment it is unloaded at our godown, all the way to the moment it leaves for a customer or dealer. The tracking happens at the <strong>serial number level</strong>. Every unit has a unique serial number on its box. We scan it when it comes in. We scan it when it goes out. That's the core of this.
+    </p>
+
+    <div class="pull">
+      <p>Think of it this way — I should be able to type any serial number into the system at any point in time and immediately know: when did it arrive, which godown is it in, who received it, has it been sold, and if yes — to whom, on what date, and who handed it over.</p>
+    </div>
+
+    <div class="section-break">
+      <div class="section-break-line"></div>
+      <div class="section-break-label">The Inward Process</div>
+      <div class="section-break-line"></div>
+    </div>
+
+    <p>
+      When stock arrives, my staff should open the app on their phone, fill in the basic details — <strong>date, which godown, brand, model number, product category, HSN code, the supplier name</strong>, and their own name — and then start scanning. The phone camera should read the barcode or QR code on each unit's box, and each scan should add that serial number to the entry. One tap per unit. When they're done, they hit save, and every serial number they scanned gets logged into the system as <em>In Stock</em> with all those details attached to it. This entire batch also writes automatically to our <strong>Google Sheet</strong> so I can see it live from anywhere.
+    </p>
+
+    <div class="section-break">
+      <div class="section-break-line"></div>
+      <div class="section-break-label">The Outward Process</div>
+      <div class="section-break-line"></div>
+    </div>
+
+    <p>
+      When stock goes out — whether it's a retail sale, a dealer transfer, or anything else — my staff fills in the dispatch details. <strong>Dealer name, full address, dealer GSTIN if available, the invoice number, who is handing it over, how it's being transported</strong>. Then they scan each unit going out. The system should immediately verify that each serial number being scanned actually exists in our inventory and is currently in stock. If someone accidentally scans a unit that's already been dispatched, it should reject it with a clear error. Only verified, in-stock units can go out.
+    </p>
+
+    <p>
+      They also enter a <strong>price per unit and the applicable GST rate</strong> — and the app should automatically calculate the taxable value, split the CGST and SGST, and show the grand total. All of this feeds directly into the dispatch challan.
+    </p>
+
+    <div class="section-break">
+      <div class="section-break-line"></div>
+      <div class="section-break-label">The Dispatch Challan</div>
+      <div class="section-break-line"></div>
+    </div>
+
+    <p>
+      This is important. Every outward movement needs a <strong>printed dispatch challan</strong>. The moment my staff completes an outward entry, they should be able to tap one button, see a clean print-ready preview, and either print it directly or save it as a PDF on their phone. The challan should carry my company's name, address, GSTIN, and phone at the top. Then the dealer's details. Then a proper table listing <strong>every single serial number</strong> being dispatched, with its brand, model, category, and HSN code. Below that, a GST summary showing the taxable value, CGST, SGST, and grand total. And at the bottom, a signature box for the authorised person from our side and a receiver's stamp box for the dealer. Professional, clean, A4 format. White background, black text — it needs to look like a real business document.
+    </p>
+
+    <div class="pull">
+      <p>I also need to be able to go back to any past dispatch from the admin panel and reprint its challan at any time. The records should never disappear.</p>
+    </div>
+
+    <div class="section-break">
+      <div class="section-break-line"></div>
+      <div class="section-break-label">Access Control — This Is Critical</div>
+      <div class="section-break-line"></div>
+    </div>
+
+    <p>
+      The system has two types of users and I need a hard wall between them. There is <strong>me — the admin</strong> — and there are <strong>my employees</strong>. I have one admin account with a username and password that I set. My employees do not create their own accounts. I create accounts for them. When I add a new staff member, the system auto-generates a unique Employee ID for them — something like <mark>RE-2024-0047</mark> — and I set their password. That's how they log in.
+    </p>
+
+    <p>
+      Once an employee logs in, they should see <strong>exactly two things</strong> — the Inward entry screen and the Outward dispatch screen. Nothing else. No inventory list. No reports. No settings. No way to see what other serial numbers we have or what prices we charge or any business data. Just their job — scan stock in, scan stock out. Everything else is mine alone.
+    </p>
+
+    <p>
+      I should be able to <strong>deactivate any employee account instantly</strong> the moment someone leaves or I don't want them to have access anymore. They should be kicked out and blocked immediately. I also want to see a full activity log — every action every employee took, with timestamps, so I always know who did what.
+    </p>
+
+    <div class="section-break">
+      <div class="section-break-line"></div>
+      <div class="section-break-label">The Admin Side</div>
+      <div class="section-break-line"></div>
+    </div>
+
+    <p>
+      My side of the app is the full picture. A <strong>dashboard</strong> showing how many units are currently in stock, how many have been sold, how many were received this month. A complete <strong>inventory table</strong> where I can search by serial number, filter by brand or godown or status, and export everything to CSV. The full <strong>inward and outward history</strong>. Staff management. And settings where I can configure my company details, manage my godown list, and connect the Google Sheets integration.
+    </p>
+
+    <div class="section-break">
+      <div class="section-break-line"></div>
+      <div class="section-break-label">Google Sheets as the Live Database</div>
+      <div class="section-break-line"></div>
+    </div>
+
+    <p>
+      I want <strong>Google Sheets to be the live record</strong> of everything. Every scan — inward or outward — should write to my Sheet in real time. The Sheet has four tabs: Inventory, Inward Log, Outward Log, and a Staff Activity Log. I can open that Sheet from my laptop or phone at any time and see the exact current state of my entire stock. Even if the app is not open. This is important to me — I don't want data locked inside an app I can't see without opening it.
+    </p>
+
+    <p>
+      The integration should use a <strong>Google service account</strong> so it writes reliably without requiring me to log in with Google every time. And if my staff is working in an area with poor internet, the app should still work offline — save locally, then sync to Sheets automatically when the connection returns.
+    </p>
+
+    <div class="section-break">
+      <div class="section-break-line"></div>
+      <div class="section-break-label">Design & Platform</div>
+      <div class="section-break-line"></div>
+    </div>
+
+    <p>
+      The design should be <strong>light and clean</strong> — white backgrounds, easy to read in a godown under fluorescent lights, large tap targets because my staff is handling boxes while using this. Deep blue as the primary colour for buttons and highlights. Clear status colours — green for in stock, red for sold, amber for dispatched. The app needs to feel professional, not like a prototype.
+    </p>
+
+    <p>
+      I need this as a <strong>website that works on any phone browser</strong> — so any staff member can use it immediately — and also as an <strong>Android APK</strong> that my permanent staff can install on their phones for the best camera scanning experience. Both should be the same product, same data, same Google Sheet behind them.
+    </p>
+
+    <div class="closing">
+      <p class="closing-line">
+        I've attached a detailed Product Requirements Document with the full data schema, permission matrix, all form fields, Google Sheets column structure, and a phased delivery plan. That document has everything you need to scope and build this properly. I'm happy to walk through it together whenever you're ready.
+      </p>
+      <p class="closing-line" style="margin-bottom: 36px;">
+        Looking forward to building this with you.
+      </p>
+      <div class="sig-name">Raj Electronics</div>
+      <div class="sig-title">Hyderabad · March 2026</div>
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-note">Confidential — For Antigravity Agency Use Only</div>
+    <div class="footer-ref">Ref: RE-STOCK-TRACKER-2026</div>
+  </div>
+
+</div>
+
+<button class="print-btn no-print" onclick="window.print()">🖨 Print / Save PDF</button>
+
+</body>
+</html>
