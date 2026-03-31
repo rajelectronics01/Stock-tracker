@@ -23,6 +23,7 @@ export default function BarcodeScanner({
   const [zoomLevel, setZoomLevel] = useState(1);
   const [hasZoom, setHasZoom] = useState(false);
   const [lastScannedValue, setLastScannedValue] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const lastScannedTS = useRef<{ value: string; ts: number } | null>(null);
@@ -60,55 +61,67 @@ export default function BarcodeScanner({
     const startScanner = async () => {
       try {
         const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
-        
         scanner = new Html5Qrcode('reader', {
           verbose: false,
-          experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true
-          }
+          experimentalFeatures: { useBarCodeDetectorIfSupported: true }
         });
         scannerRef.current = scanner;
 
-        // Instant Audio Feedback for 'Powerful' feel
         const beep = new Audio('https://assets.mixkit.co/active_storage/sfx/2215/2215-preview.mp3');
         beep.volume = 0.5;
 
-        await scanner.start(
-          { 
-            facingMode: 'environment',
-            width: { min: 1280, ideal: 1920 }, // Max resolution for fine-line detection
-            height: { min: 720, ideal: 1080 }
-          },
-          {
-            fps: 10, // Lower processing FPS allows the CPU to process dense 1D barcodes properly without choking
-            // Removed qrbox constraint: By scanning the ENTIRE view, long barcodes like Lloyd/Sansui 
-            // no longer get cut off at the edges, meaning users don't have to zoom out perfectly.
-            disableFlip: false, // Help with any inverted orientations
-            formatsToSupport: [ 
-              Html5QrcodeSupportedFormats.CODE_128, 
-              Html5QrcodeSupportedFormats.CODE_39,
-              Html5QrcodeSupportedFormats.CODE_93,
-              Html5QrcodeSupportedFormats.EAN_13,
-              Html5QrcodeSupportedFormats.EAN_8,
-              Html5QrcodeSupportedFormats.UPC_A,
-              Html5QrcodeSupportedFormats.UPC_E,
-              Html5QrcodeSupportedFormats.ITF,
-              Html5QrcodeSupportedFormats.QR_CODE,
-              Html5QrcodeSupportedFormats.DATA_MATRIX,
-              Html5QrcodeSupportedFormats.PDF_417
-            ],
-            aspectRatio: 1.777778,
-          },
-          (decodedText: string) => {
-            if (decodedText.length >= 6) { // Lowered slightly in case some serials are 6-7 char
-              beep.play().catch(() => {}); // Instant beep
-              handleScanSuccess(decodedText);
-            }
-          },
-          () => {} // Background processing
-        );
+        // Progressive fallback: dropping 'min' constraints so even mid-range Android phones
+        // don't throw OverconstrainedError — try best quality first, step down gracefully.
+        const resolutionFallbacks = [
+          { width: { ideal: 1920 }, height: { ideal: 1080 } },
+          { width: { ideal: 1280 }, height: { ideal: 720 } },
+          { width: { ideal: 640 },  height: { ideal: 480 } },
+          {}, // bare-minimum: let browser pick anything
+        ];
 
-        // Bind tracks for torch and zoom
+        const scanConfig = {
+          fps: 10,
+          disableFlip: false,
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.CODE_93,  Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,    Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,    Html5QrcodeSupportedFormats.ITF,
+            Html5QrcodeSupportedFormats.QR_CODE,  Html5QrcodeSupportedFormats.DATA_MATRIX,
+            Html5QrcodeSupportedFormats.PDF_417,
+          ],
+          aspectRatio: 1.777778,
+        };
+
+        const onScanSuccess = (decodedText: string) => {
+          if (decodedText.length >= 6) {
+            beep.play().catch(() => {});
+            handleScanSuccess(decodedText);
+          }
+        };
+
+        let started = false;
+        let lastErr: any = null;
+
+        for (const res of resolutionFallbacks) {
+          try {
+            await scanner.start(
+              { facingMode: 'environment', ...res },
+              scanConfig,
+              onScanSuccess,
+              () => {}
+            );
+            started = true;
+            break;
+          } catch (err: any) {
+            lastErr = err;
+            // Permission denied — no point trying lower resolutions
+            if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') break;
+          }
+        }
+
+        if (!started) throw lastErr ?? new Error('Camera unavailable');
+
         const stream = (scanner as any)._localMediaStream as MediaStream;
         if (stream) {
           const videoTrack = stream.getVideoTracks()[0];
@@ -119,8 +132,17 @@ export default function BarcodeScanner({
             setHasZoom(!!caps?.zoom);
           }
         }
+        setErrorConfiguring(null);
       } catch (err: any) {
-        setErrorConfiguring(err.message || 'Camera blocked');
+        const name: string = err?.name ?? '';
+        const msg: string  = err?.message ?? '';
+        const isPermission =
+          name === 'NotAllowedError' ||
+          name === 'PermissionDeniedError' ||
+          msg.toLowerCase().includes('permission') ||
+          msg.toLowerCase().includes('denied') ||
+          msg.toLowerCase().includes('blocked');
+        setErrorConfiguring(isPermission ? 'PERMISSION_DENIED' : (msg || 'UNKNOWN'));
       }
     };
 
@@ -131,7 +153,7 @@ export default function BarcodeScanner({
         scannerRef.current.stop().catch(() => {});
       }
     };
-  }, [handleScanSuccess]);
+  }, [handleScanSuccess, retryCount]);
 
   // Handle Torch Toggle
   useEffect(() => {
@@ -150,11 +172,100 @@ export default function BarcodeScanner({
   }, [zoomLevel, hasZoom]);
 
   if (errorConfiguring) {
+    const isPermission = errorConfiguring === 'PERMISSION_DENIED';
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
     return (
-      <div style={{ padding: 20, textAlign: 'center', background: '#ffebee', color: '#c62828', borderRadius: 12 }}>
-        <p style={{ fontWeight: 'bold' }}>Camera Error</p>
-        <p style={{ fontSize: 13, marginBottom: 12 }}>{errorConfiguring}</p>
-        <button className="btn btn-primary" onClick={() => window.location.reload()}>Reload Page</button>
+      <div style={{
+        padding: 24,
+        textAlign: 'center',
+        background: 'linear-gradient(135deg,#1a0a0a,#2d0f0f)',
+        color: '#fff',
+        borderRadius: 16,
+        border: '1px solid rgba(220,50,50,0.4)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+      }}>
+        <div style={{ fontSize: 40, marginBottom: 8 }}>{isPermission ? '🚫' : '📷'}</div>
+        <p style={{ fontWeight: 700, fontSize: 16, margin: '0 0 6px' }}>
+          {isPermission ? 'Camera Access Blocked' : 'Camera Error'}
+        </p>
+        <p style={{ fontSize: 13, color: '#ffcdd2', marginBottom: 16, lineHeight: 1.5 }}>
+          {isPermission
+            ? 'The browser was denied camera access. Follow these steps:'
+            : 'Could not start the camera. Try the steps below:'}
+        </p>
+
+        <div style={{
+          background: 'rgba(255,255,255,0.08)',
+          borderRadius: 10,
+          padding: '12px 16px',
+          textAlign: 'left',
+          fontSize: 13,
+          lineHeight: 1.8,
+          marginBottom: 16,
+          color: '#fff',
+        }}>
+          {isPermission ? (
+            isIOS ? (
+              <>
+                <b>iPhone / iPad:</b><br />
+                1. Open <b>Settings → Safari</b><br />
+                2. Tap <b>Camera → Allow</b><br />
+                3. Come back and tap <b>Retry</b>
+              </>
+            ) : (
+              <>
+                <b>Android / Chrome:</b><br />
+                1. Tap the 🔒 lock icon in the address bar<br />
+                2. Set <b>Camera → Allow</b><br />
+                3. Tap <b>Retry</b> below<br />
+                <span style={{ color: '#ffb3b3' }}>⚠️ Must be on HTTPS, not http://</span>
+              </>
+            )
+          ) : (
+            <>
+              1. Make sure no other app is using the camera<br />
+              2. Refresh the page<br />
+              3. Allow camera when the browser asks
+            </>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => {
+              setErrorConfiguring(null);
+              setRetryCount(c => c + 1);
+            }}
+            style={{
+              padding: '10px 22px',
+              borderRadius: 8,
+              background: 'var(--blue, #2563eb)',
+              color: '#fff',
+              border: 'none',
+              fontWeight: 700,
+              fontSize: 14,
+              cursor: 'pointer',
+            }}
+          >
+            🔄 Retry
+          </button>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              padding: '10px 22px',
+              borderRadius: 8,
+              background: 'rgba(255,255,255,0.15)',
+              color: '#fff',
+              border: '1px solid rgba(255,255,255,0.2)',
+              fontWeight: 600,
+              fontSize: 14,
+              cursor: 'pointer',
+            }}
+          >
+            ↺ Reload Page
+          </button>
+        </div>
       </div>
     );
   }
