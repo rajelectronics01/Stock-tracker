@@ -95,10 +95,15 @@ export default function BarcodeScanner({
         }
 
         // ─── STEP 2: Start html5-qrcode ───────────────────────────────────
+        // ⚠️ Small delay: iOS Safari needs ~300ms after a stream is released
+        // before another getUserMedia call can successfully open the same camera
+        await new Promise((r) => setTimeout(r, 300));
+
         const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
         scanner = new Html5Qrcode('reader', {
           verbose: false,
-          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+          // ❌ Do NOT set experimentalFeatures — iOS BarcodeDetector throws
+          // on unsupported formats (DATA_MATRIX, PDF_417, etc.)
         });
         scannerRef.current = scanner;
 
@@ -109,12 +114,17 @@ export default function BarcodeScanner({
           fps: 10,
           disableFlip: false,
           formatsToSupport: [
-            Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.CODE_93,  Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.EAN_8,    Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.UPC_E,    Html5QrcodeSupportedFormats.ITF,
-            Html5QrcodeSupportedFormats.QR_CODE,  Html5QrcodeSupportedFormats.DATA_MATRIX,
-            Html5QrcodeSupportedFormats.PDF_417,
+            // ✅ These formats are universally supported by all mobile browsers
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.CODE_93,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.ITF,
+            Html5QrcodeSupportedFormats.QR_CODE,
+            // ❌ DATA_MATRIX & PDF_417 removed — iOS BarcodeDetector throws on these
           ],
           aspectRatio: 1.777778,
         };
@@ -161,16 +171,21 @@ export default function BarcodeScanner({
 
         if (!started) throw lastErr ?? new Error('Camera unavailable');
 
-        // Torch & Zoom detection
-        const stream = (scanner as any)._localMediaStream as MediaStream;
-        if (stream) {
-          const videoTrack = stream.getVideoTracks()[0];
-          videoTrackRef.current = videoTrack;
-          if (videoTrack) {
-            const caps = videoTrack.getCapabilities() as any;
-            setHasTorch(!!caps?.torch);
-            setHasZoom(!!caps?.zoom);
+        // Torch & Zoom detection — wrapped in try/catch because
+        // iOS Safari does NOT support getCapabilities() and can throw
+        try {
+          const stream = (scanner as any)._localMediaStream as MediaStream;
+          if (stream) {
+            const videoTrack = stream.getVideoTracks()[0];
+            videoTrackRef.current = videoTrack;
+            if (videoTrack && typeof videoTrack.getCapabilities === 'function') {
+              const caps = videoTrack.getCapabilities() as any;
+              setHasTorch(!!caps?.torch);
+              setHasZoom(!!caps?.zoom);
+            }
           }
+        } catch (_capErr) {
+          // Silently ignore — torch/zoom just won't be available
         }
         setErrorConfiguring(null);
         setErrorDetail('');
