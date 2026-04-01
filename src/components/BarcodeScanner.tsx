@@ -58,29 +58,51 @@ export default function BarcodeScanner({
       try {
         const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
 
-        // Create a fresh scanner instance every retry
-        scanner = new Html5Qrcode('reader', { verbose: false });
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+        // ✅ Enable native BarcodeDetector on Android — it's vastly better at
+        // reading Code 128 alphanumeric barcodes (like serial numbers).
+        // ❌ Keep it OFF on iOS — iOS BarcodeDetector crashes on certain formats.
+        scanner = new Html5Qrcode('reader', {
+          verbose: false,
+          experimentalFeatures: { useBarCodeDetectorIfSupported: !isIOS },
+        });
         scannerRef.current = scanner;
 
         const beep = new Audio('https://assets.mixkit.co/active_storage/sfx/2215/2215-preview.mp3');
         beep.volume = 0.4;
 
         const config = {
-          fps: 10,
+          fps: 15,           // Higher FPS = more decode attempts per second
           disableFlip: false,
-          aspectRatio: 1.777778,
-          formatsToSupport: [
-            // Only universally-supported formats — avoids BarcodeDetector API crashes on iOS
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.CODE_93,
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.EAN_8,
-            Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.UPC_E,
-            Html5QrcodeSupportedFormats.ITF,
-            Html5QrcodeSupportedFormats.QR_CODE,
-          ],
+          aspectRatio: 2.5,  // Wider ratio so long Code 128 barcodes fit in frame
+          formatsToSupport: isIOS
+            ? [
+                // iOS: only formats that don't crash native BarcodeDetector
+                Html5QrcodeSupportedFormats.CODE_128,
+                Html5QrcodeSupportedFormats.CODE_39,
+                Html5QrcodeSupportedFormats.CODE_93,
+                Html5QrcodeSupportedFormats.EAN_13,
+                Html5QrcodeSupportedFormats.EAN_8,
+                Html5QrcodeSupportedFormats.UPC_A,
+                Html5QrcodeSupportedFormats.UPC_E,
+                Html5QrcodeSupportedFormats.ITF,
+                Html5QrcodeSupportedFormats.QR_CODE,
+              ]
+            : [
+                // Android: full format support via native BarcodeDetector
+                Html5QrcodeSupportedFormats.CODE_128,
+                Html5QrcodeSupportedFormats.CODE_39,
+                Html5QrcodeSupportedFormats.CODE_93,
+                Html5QrcodeSupportedFormats.EAN_13,
+                Html5QrcodeSupportedFormats.EAN_8,
+                Html5QrcodeSupportedFormats.UPC_A,
+                Html5QrcodeSupportedFormats.UPC_E,
+                Html5QrcodeSupportedFormats.ITF,
+                Html5QrcodeSupportedFormats.QR_CODE,
+                Html5QrcodeSupportedFormats.DATA_MATRIX,
+                Html5QrcodeSupportedFormats.PDF_417,
+              ],
         };
 
         const onSuccess = (text: string) => {
@@ -89,8 +111,6 @@ export default function BarcodeScanner({
             handleScanSuccess(text);
           }
         };
-
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
         // On iOS: pass ONLY facingMode — no width/height constraints,
         // which cause OverconstrainedError on many iPhone models
@@ -299,10 +319,13 @@ export default function BarcodeScanner({
 
   // ─── Scanner UI ─────────────────────────────────────────────────────────────
   return (
-    <div style={{ position: 'relative', width: '100%', aspectRatio: '16/10', background: '#000', borderRadius: 14, overflow: 'hidden' }}>
-      <div id="reader" style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'contrast(1.25) brightness(1.1) saturate(1.1)' }} />
-      <div style={{ position: 'absolute', top: '50%', left: '10%', right: '10%', height: 2, background: 'red', boxShadow: '0 0 10px red', zIndex: 10, opacity: 0.6 }} />
-      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '90%', height: '45%', border: '2px solid var(--blue)', borderRadius: 10, boxShadow: '0 0 0 999px rgba(0,0,0,0.5)', pointerEvents: 'none' }} />
+    // aspectRatio 5/2 = 2.5 — wide enough to fit long Code 128 serial barcodes
+    <div style={{ position: 'relative', width: '100%', aspectRatio: '5/2', background: '#000', borderRadius: 14, overflow: 'hidden' }}>
+      <div id="reader" style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'contrast(1.3) brightness(1.15) saturate(1.1)' }} />
+      {/* Scan line spans the inner width of the target box */}
+      <div style={{ position: 'absolute', top: '50%', left: '5%', right: '5%', height: 2, background: 'red', boxShadow: '0 0 10px red', zIndex: 10, opacity: 0.7 }} />
+      {/* Target box: 90% wide, 60% tall — fits wide barcodes */}
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '90%', height: '60%', border: '2px solid var(--blue,#2563eb)', borderRadius: 8, boxShadow: '0 0 0 999px rgba(0,0,0,0.45)', pointerEvents: 'none' }} />
 
       <div style={{ position: 'absolute', top: 10, right: 10, display: 'flex', flexDirection: 'column', gap: 8, zIndex: 20 }}>
         {hasTorch && (
