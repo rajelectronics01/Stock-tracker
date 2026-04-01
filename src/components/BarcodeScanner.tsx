@@ -102,9 +102,9 @@ export default function BarcodeScanner({
     // Runs on an interval via the video element.
     let zxingReader: any = null;
     const startZXing = async (stream: MediaStream) => {
-      const { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } =
-        await import('@zxing/browser');
-      const { NotFoundException } = await import('@zxing/library');
+      const { BrowserMultiFormatReader } = await import('@zxing/browser');
+      const { BarcodeFormat, DecodeHintType, NotFoundException } =
+        await import('@zxing/library');
 
       const hints = new Map();
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [
