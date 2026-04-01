@@ -18,11 +18,11 @@ export default function BarcodeScanner({
   label = 'Align barcode in frame',
   debounceMs = 800,
 }: Props) {
-  const videoRef    = useRef<HTMLVideoElement>(null);
-  const streamRef   = useRef<MediaStream | null>(null);
-  const rafRef      = useRef<number | null>(null);
-  const lastRef     = useRef<{ value: string; ts: number } | null>(null);
-  const stoppedRef  = useRef(false);
+  const videoRef      = useRef<HTMLVideoElement>(null);
+  const streamRef     = useRef<MediaStream | null>(null);
+  const rafRef        = useRef<number | null>(null);
+  const cooldownRef   = useRef<number>(0); // timestamp until which scanning is paused
+  const stoppedRef    = useRef(false);
 
   const [errorCode, setErrorCode]   = useState<string | null>(null);
   const [debugText, setDebugText]   = useState('');
@@ -30,15 +30,16 @@ export default function BarcodeScanner({
   const [lastScan, setLastScan]     = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
-  // ─── Debounced scan handler ──────────────────────────────────────────────
+  // ─── Scan handler with 2-second hard cooldown ──────────────────────────
+  // Using a ref-based cooldown (not state) so it's synchronous and immune
+  // to React's async state batching — prevents duplicate entries.
   const handleDetected = useCallback((text: string) => {
     if (!text || text.length < 4) return;
-    const now  = Date.now();
-    const last = lastRef.current;
-    if (last && last.value === text && now - last.ts < debounceMs / 2) return;
-    lastRef.current = { value: text, ts: now };
+    const now = Date.now();
+    if (now < cooldownRef.current) return; // still in cooldown — ignore
+    cooldownRef.current = now + (debounceMs > 0 ? debounceMs : 2000); // block for 2s
     setLastScan(text);
-    setTimeout(() => setLastScan(null), 700);
+    setTimeout(() => setLastScan(null), 800);
     if (!paused) onScan(text);
   }, [onScan, paused, debounceMs]);
 

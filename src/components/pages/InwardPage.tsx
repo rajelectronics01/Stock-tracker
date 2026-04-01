@@ -36,10 +36,13 @@ export default function InwardPage() {
   const [godown, setGodown] = useState('');
   const [batchDate, setBatchDate] = useState(new Date().toISOString().split('T')[0]);
   const [supplier, setSupplier] = useState('');
-  const [serialNos, setSerialNos] = useState<string[]>([]);
+  const [serialNos, setSerialNos]     = useState<string[]>([]);
   const [manualSerial, setManualSerial] = useState('');
-  const [toasts, setToasts] = useState<{ id: number; type: 'success' | 'error'; message: string }[]>([]);
-  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [toasts, setToasts]           = useState<{ id: number; type: 'success' | 'error'; message: string }[]>([]);
+  const [settings, setSettings]       = useState<AppSettings | null>(null);
+  // Ref-based set for SYNCHRONOUS duplicate checking — avoids stale closure bug
+  // where two rapid scans both see serialNos=[] and both get added
+  const scannedSetRef = useRef<Set<string>>(new Set());
 
   const modelInputRef = useRef<HTMLDivElement>(null);
 
@@ -56,12 +59,17 @@ export default function InwardPage() {
   };
 
   const handleSerialScan = (serial: string) => {
-    if (!serial || serialNos.includes(serial)) return;
-    setSerialNos(prev => [...prev, serial]);
+    const s = serial.trim().toUpperCase();
+    if (!s) return;
+    // Check ref FIRST (synchronous) — prevents duplicates from rapid fire scans
+    if (scannedSetRef.current.has(s)) return;
+    scannedSetRef.current.add(s);
+    setSerialNos(prev => [...prev, s]);
   };
 
   const removeSerial = (serial: string) => {
     if (window.confirm(`Are you sure you want to remove ${serial}?`)) {
+      scannedSetRef.current.delete(serial);
       setSerialNos(prev => prev.filter(s => s !== serial));
       addToast('success', `Removed ${serial}`);
     }
@@ -86,6 +94,7 @@ export default function InwardPage() {
       addToast('error', `⚠️ ${skipped.length} duplicate serials skipped.`);
     }
     addToast('success', `✅ ${added} items saved to cloud inventory!`);
+    scannedSetRef.current.clear(); // reset dedup ref after save
     setTimeout(() => window.location.reload(), 1800);
   };
 
