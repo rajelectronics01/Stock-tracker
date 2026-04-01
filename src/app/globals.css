@@ -442,10 +442,11 @@ tr:hover { background: var(--surface2); }
 
 .mobile-nav-item {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 4px; color: var(--text3); text-decoration: none; font-size: 11px; font-weight: 700; width: 60px;
+  gap: 2px; color: var(--text3); text-decoration: none; font-size: 10px; font-weight: 700; flex: 1;
+  padding: 4px 0; border: none; background: none; cursor: pointer;
 }
 .mobile-nav-item.active { color: var(--blue); }
-.mobile-nav-icon { font-size: 20px; }
+.mobile-nav-icon { font-size: 18px; }
 
 /* ── BADGES ─────────────────────────────────── */
 .badge {

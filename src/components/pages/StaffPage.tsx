@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getUsers, saveUsers, generateEmployeeId, simpleHash, getSettings } from '@/lib/store';
+import { getUsers, saveUsers, simpleHash, getSettings } from '@/lib/store';
 import type { User } from '@/lib/types';
 import Toast from '../Toast';
 
@@ -11,6 +11,7 @@ export default function StaffPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState('');
+  const [newUserId, setNewUserId] = useState('');
   const [newPwd, setNewPwd] = useState('');
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
   const [resetPwdFor, setResetPwdFor] = useState<string | null>(null);
@@ -27,24 +28,28 @@ export default function StaffPage() {
   const reload = () => setUsers(getUsers());
 
   const addEmployee = () => {
-    if (!newName.trim() || !newPwd.trim()) {
-      addToast('error', 'Name and password are required.'); return;
+    const trimmedId = newUserId.trim().toUpperCase();
+    if (!newName.trim() || !trimmedId || !newPwd.trim()) {
+      addToast('error', 'Username, Name and Password are required.'); return;
     }
-    const id = generateEmployeeId();
+    const all = getUsers();
+    if (all.some(u => u.id.toUpperCase() === trimmedId)) {
+      addToast('error', 'Username/ID already exists.'); return;
+    }
+
     const user: User = {
-      id,
+      id: trimmedId,
       name: newName.trim(),
       role: 'employee',
       passwordHash: simpleHash(newPwd),
       active: true,
       createdAt: new Date().toISOString(),
     };
-    const all = getUsers();
     all.push(user);
     saveUsers(all);
     reload();
-    addToast('success', `✅ Employee ${id} created successfully.`);
-    setNewName(''); setNewPwd(''); setShowAdd(false);
+    addToast('success', `✅ User ${trimmedId} created successfully.`);
+    setNewName(''); setNewUserId(''); setNewPwd(''); setShowAdd(false);
   };
 
   const toggleActive = (id: string) => {
@@ -103,16 +108,18 @@ export default function StaffPage() {
                   value={newName} onChange={e => setNewName(e.target.value)} autoFocus />
               </div>
               <div className="form-group">
+                <label className="form-label">Login ID / Username <span>*</span></label>
+                <input type="text" className="form-control" placeholder="e.g. RAVI123"
+                  value={newUserId} onChange={e => setNewUserId(e.target.value)} />
+              </div>
+              <div className="form-group">
                 <label className="form-label">Password <span>*</span></label>
-                <input type="text" className="form-control" placeholder="Set initial password"
+                <input type="text" className="form-control" placeholder="Set password"
                   value={newPwd} onChange={e => setNewPwd(e.target.value)} />
               </div>
             </div>
-            <div style={{ marginTop: 12, background: 'var(--blue-light)', border: '1px solid var(--blue-mid)', borderRadius: 'var(--radius-sm)', padding: '8px 12px', fontSize: 12, color: 'var(--blue)' }}>
-              💡 An Employee ID will be auto-generated (e.g. RE-{new Date().getFullYear()}-{String(users.length + 1).padStart(4,'0')})
-            </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
-              <button className="btn btn-secondary" onClick={() => { setShowAdd(false); setNewName(''); setNewPwd(''); }}>Cancel</button>
+              <button className="btn btn-secondary" onClick={() => { setShowAdd(false); setNewName(''); setNewUserId(''); setNewPwd(''); }}>Cancel</button>
               <button className="btn btn-primary" onClick={addEmployee} id="btn-create-employee">Create Account</button>
             </div>
           </div>
@@ -145,7 +152,7 @@ export default function StaffPage() {
           <table>
             <thead>
               <tr>
-                <th>Employee ID</th>
+                <th>Username/ID</th>
                 <th>Name</th>
                 <th>Status</th>
                 <th>Created</th>

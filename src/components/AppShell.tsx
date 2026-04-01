@@ -25,7 +25,7 @@ const ADMIN_NAV = [
   { id: 'outward', label: 'Outward Dispatch', icon: '📤' },
   { id: 'inward-log', label: 'Inward Log', icon: '📋' },
   { id: 'outward-log', label: 'Outward Log', icon: '🧾' },
-  { id: 'staff', label: 'Staff Management', icon: '👥' },
+  { id: 'staff', label: 'Users & Passwords', icon: '👥' },
   { id: 'activity', label: 'Activity Log', icon: '🔍' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ];
@@ -138,13 +138,29 @@ export default function AppShell() {
           {isAdmin ? 'Inward' : 'Outward'}
         </button>
         {isAdmin && (
-          <button
-            className={`mobile-nav-item ${page === 'outward' ? 'active' : ''}`}
-            onClick={() => setPage('outward')}
-          >
-            <span className="mobile-nav-icon">📤</span>
-            Outward
-          </button>
+          <>
+            <button
+              className={`mobile-nav-item ${page === 'outward' ? 'active' : ''}`}
+              onClick={() => setPage('outward')}
+            >
+              <span className="mobile-nav-icon">📤</span>
+              Outward
+            </button>
+            <button
+              className={`mobile-nav-item ${page === 'staff' ? 'active' : ''}`}
+              onClick={() => setPage('staff')}
+            >
+              <span className="mobile-nav-icon">👥</span>
+              Users
+            </button>
+            <button
+              className={`mobile-nav-item ${page === 'settings' ? 'active' : ''}`}
+              onClick={() => setPage('settings')}
+            >
+              <span className="mobile-nav-icon">⚙️</span>
+              Settings
+            </button>
+          </>
         )}
         <button className="mobile-nav-item" onClick={logout}>
           <span className="mobile-nav-icon">🚪</span>

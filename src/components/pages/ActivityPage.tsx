@@ -7,8 +7,6 @@ import type { ActivityLog } from '@/lib/types';
 const ACTION_COLORS: Record<string, string> = {
   INWARD: 'badge-green',
   OUTWARD: 'badge-blue',
-  LOGIN: 'badge-amber',
-  LOGOUT: 'badge-purple',
 };
 
 export default function ActivityPage() {
@@ -16,7 +14,13 @@ export default function ActivityPage() {
   const [search, setSearch] = useState('');
   const [actionFilter, setActionFilter] = useState('ALL');
 
-  useEffect(() => { getActivityLogs().then(setLogs); }, []);
+  useEffect(() => {
+    getActivityLogs().then(allLogs => {
+      // Filter out system events, keeping only Inward and Outward actions
+      const staffActions = allLogs.filter(l => l.action === 'INWARD' || l.action === 'OUTWARD');
+      setLogs(staffActions);
+    });
+  }, []);
 
   const filtered = logs.filter(l => {
     const q = search.toLowerCase();
@@ -47,8 +51,6 @@ export default function ActivityPage() {
               <option value="ALL">All Actions</option>
               <option value="INWARD">Inward</option>
               <option value="OUTWARD">Outward</option>
-              <option value="LOGIN">Login</option>
-              <option value="LOGOUT">Logout</option>
             </select>
           </div>
         </div>

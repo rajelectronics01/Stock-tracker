@@ -36,8 +36,8 @@ export default function NewLogin() {
 
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
           <div>
-            <label style={{ color: '#f1f5f9', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', marginBottom: 8, display: 'block' }}>Employee ID</label>
-            <input value={id} onChange={e => setId(e.target.value.toUpperCase())} placeholder="RE-2025..." style={{ width: '100%', padding: 16, background: '#0f172a', border: '1px solid #334155', color: '#fff', borderRadius: 12, outline: 'none', fontSize: 16 }} />
+            <label style={{ color: '#f1f5f9', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', marginBottom: 8, display: 'block' }}>Login ID / Username</label>
+            <input value={id} onChange={e => setId(e.target.value.toUpperCase())} placeholder="ID or Username..." style={{ width: '100%', padding: 16, background: '#0f172a', border: '1px solid #334155', color: '#fff', borderRadius: 12, outline: 'none', fontSize: 16 }} />
           </div>
           <div>
             <label style={{ color: '#f1f5f9', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', marginBottom: 8, display: 'block' }}>Password</label>

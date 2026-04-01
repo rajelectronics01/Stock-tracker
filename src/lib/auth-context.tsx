@@ -62,7 +62,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
       setUser(adminUser);
       sessionStorage.setItem('re_session', JSON.stringify(adminUser));
-      addActivityLog({ staffId: 'ADMIN', staffName: 'Admin', action: 'LOGIN' });
       return { ok: true };
     }
 
@@ -89,14 +88,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setUser(found);
     sessionStorage.setItem('re_session', JSON.stringify(found));
-    addActivityLog({ staffId: found.id, staffName: found.name, action: 'LOGIN' });
     return { ok: true };
   };
 
   const logout = () => {
-    if (user) {
-      addActivityLog({ staffId: user.id, staffName: user.name, action: 'LOGOUT' });
-    }
     setUser(null);
     sessionStorage.removeItem('re_session');
   };

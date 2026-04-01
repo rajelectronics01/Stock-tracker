@@ -34,7 +34,7 @@ export default function InwardLogPage() {
       <div className="page-body">
         <div className="card mb-4">
           <input type="text" className="form-control"
-            placeholder="🔍 Search by brand, godown, supplier, staff, or date…"
+            placeholder="🔍 Search by brand, model, user, or date…"
             value={search} onChange={e => setSearch(e.target.value)} />
         </div>
 
@@ -48,7 +48,7 @@ export default function InwardLogPage() {
                 <th>Category</th>
                 <th>Godown</th>
                 <th>Supplier</th>
-                <th>Staff</th>
+                <th>User</th>
                 <th>Units</th>
               </tr>
             </thead>

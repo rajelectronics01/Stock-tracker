@@ -76,12 +76,6 @@ export function saveUsers(users: User[]): void {
   set(KEYS.users, users);
 }
 
-export function generateEmployeeId(): string {
-  const year = new Date().getFullYear();
-  const users = getUsers();
-  const seq = (users.length + 1).toString().padStart(4, '0');
-  return `RE-${year}-${seq}`;
-}
 
 // ── CHALLAN NO (localStorage) ─────────────────────────
 export function generateChallanNo(): string {

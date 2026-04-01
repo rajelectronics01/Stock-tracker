@@ -34,7 +34,7 @@ export default function OutwardLogPage() {
       <div className="page-body">
         <div className="card mb-4">
           <input type="text" className="form-control"
-            placeholder="🔍 Search by challan no, buyer, staff, or date…"
+            placeholder="🔍 Search by challan, buyer, user, or date…"
             value={search} onChange={e => setSearch(e.target.value)} />
         </div>
 
@@ -47,7 +47,7 @@ export default function OutwardLogPage() {
                 <th>Buyer</th>
                 <th>Units</th>
                 <th>Sale Type</th>
-                <th>Handed By</th>
+                <th>Handed By (User)</th>
                 <th>GST Rate</th>
                 <th>Actions</th>
               </tr>
