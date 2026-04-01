@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-// Import only types at the top level to prevent SSR crashes
 import type { Html5Qrcode } from 'html5-qrcode';
 
 interface Props {
@@ -17,104 +16,61 @@ export default function BarcodeScanner({
   label = 'Align Barcode in the frame',
   debounceMs = 800,
 }: Props) {
-  const [errorConfiguring, setErrorConfiguring] = useState<string | null>(null);
-  const [errorDetail, setErrorDetail] = useState<string>('');
-  const [hasTorch, setHasTorch] = useState(false);
-  const [torchOn, setTorchOn] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [hasZoom, setHasZoom] = useState(false);
-  const [lastScannedValue, setLastScannedValue] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
+  const [errorCode, setErrorCode]     = useState<string | null>(null);
+  const [debugText, setDebugText]     = useState<string>('');
+  const [hasTorch, setHasTorch]       = useState(false);
+  const [torchOn, setTorchOn]         = useState(false);
+  const [zoomLevel, setZoomLevel]     = useState(1);
+  const [hasZoom, setHasZoom]         = useState(false);
+  const [lastScan, setLastScan]       = useState<string | null>(null);
+  const [retryCount, setRetryCount]   = useState(0);
 
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  const lastScannedTS = useRef<{ value: string; ts: number } | null>(null);
+  const scannerRef    = useRef<Html5Qrcode | null>(null);
+  const lastScanTS    = useRef<{ value: string; ts: number } | null>(null);
   const videoTrackRef = useRef<MediaStreamTrack | null>(null);
+  const stoppedRef    = useRef(false); // tracks whether cleanup already ran
 
-  const handleScanSuccess = useCallback(
-    (decodedText: string) => {
-      const now = Date.now();
-      const last = lastScannedTS.current;
-
-      if (decodedText.length < 4) return;
-
-      if (last && last.value === decodedText && now - last.ts < (debounceMs / 2)) {
-        return;
-      }
-
-      lastScannedTS.current = { value: decodedText, ts: now };
-      setLastScannedValue(decodedText);
-
-      setTimeout(() => setLastScannedValue(null), 600);
-
-      if (!paused) {
-        onScan(decodedText);
-      }
-    },
-    [onScan, paused, debounceMs]
-  );
+  const handleScanSuccess = useCallback((decodedText: string) => {
+    if (decodedText.length < 4) return;
+    const now  = Date.now();
+    const last = lastScanTS.current;
+    if (last && last.value === decodedText && now - last.ts < debounceMs / 2) return;
+    lastScanTS.current = { value: decodedText, ts: now };
+    setLastScan(decodedText);
+    setTimeout(() => setLastScan(null), 600);
+    if (!paused) onScan(decodedText);
+  }, [onScan, paused, debounceMs]);
 
   useEffect(() => {
-    // SSR Protection
     if (typeof window === 'undefined') return;
-    // mediaDevices not available at all (non-HTTPS or very old browser)
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setErrorConfiguring('NO_API');
-      setErrorDetail('navigator.mediaDevices is not available. Make sure you are on HTTPS.');
+
+    // No camera API at all (rare — usually means non-HTTPS)
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      setErrorCode('NO_API');
+      setDebugText('navigator.mediaDevices unavailable — must be HTTPS');
       return;
     }
 
-    let scanner: any = null;
-    let preflightStream: MediaStream | null = null;
+    stoppedRef.current = false;
+    let scanner: any   = null;
 
-    const startScanner = async () => {
+    const start = async () => {
       try {
-        // ─── STEP 1: Pre-flight getUserMedia ───────────────────────────────
-        // This is the key fix for iOS Safari. We explicitly ask for permission
-        // and get a stream BEFORE html5-qrcode tries. This:
-        //  a) triggers the iOS permission dialog correctly
-        //  b) surfaces NotAllowedError / NotFoundError cleanly
-        //  c) avoids html5-qrcode's opaque internal errors on iOS
-        try {
-          preflightStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: 'environment' } },
-            audio: false,
-          });
-          // Stop the preflight stream — html5-qrcode will open its own
-          preflightStream.getTracks().forEach((t) => t.stop());
-          preflightStream = null;
-        } catch (preflightErr: any) {
-          // Re-classify and throw so it's caught below
-          const n = preflightErr?.name ?? '';
-          if (n === 'NotAllowedError' || n === 'PermissionDeniedError') {
-            throw Object.assign(new Error('PERMISSION_DENIED'), { name: 'NotAllowedError' });
-          }
-          if (n === 'NotFoundError' || n === 'DevicesNotFoundError') {
-            throw Object.assign(new Error('NO_CAMERA_FOUND'), { name: 'NotFoundError' });
-          }
-          throw preflightErr;
-        }
-
-        // ─── STEP 2: Start html5-qrcode ───────────────────────────────────
-        // ⚠️ Small delay: iOS Safari needs ~300ms after a stream is released
-        // before another getUserMedia call can successfully open the same camera
-        await new Promise((r) => setTimeout(r, 300));
-
         const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
-        scanner = new Html5Qrcode('reader', {
-          verbose: false,
-          // ❌ Do NOT set experimentalFeatures — iOS BarcodeDetector throws
-          // on unsupported formats (DATA_MATRIX, PDF_417, etc.)
-        });
+
+        // Create a fresh scanner instance every retry
+        scanner = new Html5Qrcode('reader', { verbose: false });
         scannerRef.current = scanner;
 
         const beep = new Audio('https://assets.mixkit.co/active_storage/sfx/2215/2215-preview.mp3');
-        beep.volume = 0.5;
+        beep.volume = 0.4;
 
-        const scanConfig = {
+        const config = {
           fps: 10,
           disableFlip: false,
+          aspectRatio: 1.777778,
           formatsToSupport: [
-            // ✅ These formats are universally supported by all mobile browsers
+            // Only universally-supported formats — avoids BarcodeDetector API crashes on iOS
             Html5QrcodeSupportedFormats.CODE_128,
             Html5QrcodeSupportedFormats.CODE_39,
             Html5QrcodeSupportedFormats.CODE_93,
@@ -124,272 +80,238 @@ export default function BarcodeScanner({
             Html5QrcodeSupportedFormats.UPC_E,
             Html5QrcodeSupportedFormats.ITF,
             Html5QrcodeSupportedFormats.QR_CODE,
-            // ❌ DATA_MATRIX & PDF_417 removed — iOS BarcodeDetector throws on these
           ],
-          aspectRatio: 1.777778,
         };
 
-        const onScanSuccess = (decodedText: string) => {
-          if (decodedText.length >= 6) {
+        const onSuccess = (text: string) => {
+          if (text.length >= 6) {
             beep.play().catch(() => {});
-            handleScanSuccess(decodedText);
+            handleScanSuccess(text);
           }
         };
 
-        // Progressive resolution fallback — most critical for mid-range Androids
-        // On iOS: never pass width/height constraints, let Safari choose
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-        const resolutionFallbacks = isIOS
+
+        // On iOS: pass ONLY facingMode — no width/height constraints,
+        // which cause OverconstrainedError on many iPhone models
+        // On Android: progressive fallback from HD → bare-minimum
+        const cameraConstraints = isIOS
           ? [
-              { facingMode: { ideal: 'environment' } },              // iOS: no res constraints
+              { facingMode: { exact: 'environment' } },
+              { facingMode: 'environment' },
+              {},
             ]
           : [
               { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
               { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
               { facingMode: 'environment', width: { ideal: 640 },  height: { ideal: 480 } },
-              { facingMode: 'environment' },                          // bare-minimum
+              { facingMode: 'environment' },
+              {},
             ];
 
         let started = false;
         let lastErr: any = null;
 
-        for (const constraints of resolutionFallbacks) {
+        for (const constraints of cameraConstraints) {
+          if (stoppedRef.current) return; // component unmounted mid-loop
           try {
-            await scanner.start(
-              constraints,
-              scanConfig,
-              onScanSuccess,
-              () => {}
-            );
+            await scanner.start(constraints, config, onSuccess, () => {});
             started = true;
             break;
           } catch (err: any) {
             lastErr = err;
+            // Permission denied → no point trying other resolutions
             if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') break;
+            // Camera busy/hardware error → don't keep trying
+            if (err?.name === 'NotReadableError' || err?.name === 'AbortError') break;
           }
         }
 
-        if (!started) throw lastErr ?? new Error('Camera unavailable');
+        if (!started) throw lastErr ?? new Error('Camera failed to start');
 
-        // Torch & Zoom detection — wrapped in try/catch because
-        // iOS Safari does NOT support getCapabilities() and can throw
+        // Torch / zoom — iOS Safari doesn't support getCapabilities()
+        // so wrap in try/catch and check the method exists first
         try {
-          const stream = (scanner as any)._localMediaStream as MediaStream;
-          if (stream) {
-            const videoTrack = stream.getVideoTracks()[0];
-            videoTrackRef.current = videoTrack;
-            if (videoTrack && typeof videoTrack.getCapabilities === 'function') {
-              const caps = videoTrack.getCapabilities() as any;
+          const mediaStream = (scanner as any)._localMediaStream as MediaStream | undefined;
+          if (mediaStream) {
+            const track = mediaStream.getVideoTracks()[0];
+            videoTrackRef.current = track ?? null;
+            if (track && typeof track.getCapabilities === 'function') {
+              const caps = track.getCapabilities() as any;
               setHasTorch(!!caps?.torch);
               setHasZoom(!!caps?.zoom);
             }
           }
-        } catch (_capErr) {
-          // Silently ignore — torch/zoom just won't be available
+        } catch {
+          // Silently skip — torch/zoom just won't appear
         }
-        setErrorConfiguring(null);
-        setErrorDetail('');
+
+        // All good
+        setErrorCode(null);
+        setDebugText('');
+
       } catch (err: any) {
-        // Stop any preflight stream if something blew up mid-flight
-        preflightStream?.getTracks().forEach((t) => t.stop());
+        const name = (err?.name  ?? '') as string;
+        const msg  = (err?.message ?? '') as string;
 
-        const name: string = err?.name ?? '';
-        const msg: string  = err?.message ?? '';
+        let code = 'UNKNOWN';
 
-        const isPermission =
+        if (
           name === 'NotAllowedError' ||
           name === 'PermissionDeniedError' ||
-          msg === 'PERMISSION_DENIED' ||
           msg.toLowerCase().includes('permission') ||
-          msg.toLowerCase().includes('denied') ||
-          msg.toLowerCase().includes('blocked');
-
-        const isNoCamera =
+          msg.toLowerCase().includes('denied')
+        ) {
+          code = 'PERMISSION_DENIED';
+        } else if (
           name === 'NotFoundError' ||
           name === 'DevicesNotFoundError' ||
-          msg === 'NO_CAMERA_FOUND';
+          msg.toLowerCase().includes('not found')
+        ) {
+          code = 'NO_CAMERA';
+        } else if (
+          name === 'NotReadableError' ||
+          msg.toLowerCase().includes('not readable') ||
+          msg.toLowerCase().includes('in use') ||
+          msg.toLowerCase().includes('hardware')
+        ) {
+          code = 'BUSY';
+        }
 
-        const isNoAPI = msg === 'navigator.mediaDevices is not available. Make sure you are on HTTPS.';
-
-        let errorCode = 'UNKNOWN';
-        if (isPermission) errorCode = 'PERMISSION_DENIED';
-        else if (isNoCamera) errorCode = 'NO_CAMERA';
-        else if (isNoAPI) errorCode = 'NO_API';
-
-        // Surface the real error for debugging
-        setErrorDetail(`[${name || 'Error'}] ${msg}`);
-        setErrorConfiguring(errorCode);
+        setErrorCode(code);
+        setDebugText(`[${name || 'Error'}] ${msg}`);
       }
     };
 
-    startScanner();
+    start();
 
     return () => {
-      preflightStream?.getTracks().forEach((t) => t.stop());
-      if (scannerRef.current && scannerRef.current.isScanning) {
-        scannerRef.current.stop().catch(() => {});
+      stoppedRef.current = true;
+      if (scannerRef.current) {
+        try {
+          if (scannerRef.current.isScanning) {
+            scannerRef.current.stop().catch(() => {});
+          }
+        } catch {
+          // ignore
+        }
+        scannerRef.current = null;
       }
     };
   }, [handleScanSuccess, retryCount]);
 
-  // Handle Torch Toggle
+  // Torch
   useEffect(() => {
-    const track = videoTrackRef.current;
-    if (track && hasTorch) {
-      track.applyConstraints({ advanced: [{ torch: torchOn } as any] }).catch(() => {});
-    }
+    const t = videoTrackRef.current;
+    if (t && hasTorch) t.applyConstraints({ advanced: [{ torch: torchOn } as any] }).catch(() => {});
   }, [torchOn, hasTorch]);
 
-  // Handle Zoom Toggle
+  // Zoom
   useEffect(() => {
-    const track = videoTrackRef.current;
-    if (track && hasZoom) {
-      track.applyConstraints({ advanced: [{ zoom: zoomLevel } as any] }).catch(() => {});
-    }
+    const t = videoTrackRef.current;
+    if (t && hasZoom) t.applyConstraints({ advanced: [{ zoom: zoomLevel } as any] }).catch(() => {});
   }, [zoomLevel, hasZoom]);
 
-  if (errorConfiguring) {
-    const isPermission = errorConfiguring === 'PERMISSION_DENIED';
-    const isNoCamera  = errorConfiguring === 'NO_CAMERA';
-    const isNoAPI     = errorConfiguring === 'NO_API';
-    const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+  // ─── Error Screen ───────────────────────────────────────────────────────────
+  if (errorCode) {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-    let icon = '📷';
-    let title = 'Camera Error';
-    let subtitle = 'Could not start the camera.';
-    let steps: React.ReactNode = null;
+    const screens: Record<string, { icon: string; title: string; sub: string; steps: React.ReactNode }> = {
+      PERMISSION_DENIED: {
+        icon: '🚫', title: 'Camera Access Blocked',
+        sub: 'The browser was denied camera access.',
+        steps: isIOS ? (
+          <>
+            <b>iPhone / iPad (Safari):</b><br/>
+            1. Go to <b>Settings → Safari → Camera</b><br/>
+            2. Set to <b>Allow</b><br/>
+            3. Come back and tap <b>Retry</b>
+          </>
+        ) : (
+          <>
+            <b>Android / Chrome:</b><br/>
+            1. Tap the 🔒 icon in the address bar<br/>
+            2. Set <b>Camera → Allow</b><br/>
+            3. Tap <b>Retry</b>
+          </>
+        ),
+      },
+      NO_CAMERA: {
+        icon: '🔍', title: 'No Camera Found',
+        sub: 'Your device has no usable rear camera.',
+        steps: <>1. Close apps using the camera<br/>2. Restart your browser<br/>3. Retry</>,
+      },
+      BUSY: {
+        icon: '⚙️', title: 'Camera In Use',
+        sub: 'Another app or tab is using the camera.',
+        steps: <>1. Close other browser tabs<br/>2. Close any app using the camera<br/>3. Tap <b>Retry</b></>,
+      },
+      NO_API: {
+        icon: '🔒', title: 'HTTPS Required',
+        sub: 'Camera API only works on secure (https://) pages.',
+        steps: <>Make sure the URL starts with <b>https://</b></>,
+      },
+      UNKNOWN: {
+        icon: '📷', title: 'Camera Error',
+        sub: 'Could not start the camera.',
+        steps: (
+          <>
+            1. Make sure no other app is using the camera<br/>
+            2. Close other browser tabs<br/>
+            3. Refresh the page and allow camera access
+            {debugText && (
+              <span style={{ display: 'block', marginTop: 10, fontSize: 11, color: '#ffb3b3', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                ℹ️ {debugText}
+              </span>
+            )}
+          </>
+        ),
+      },
+    };
 
-    if (isPermission) {
-      icon = '🚫';
-      title = 'Camera Access Blocked';
-      subtitle = 'The browser was denied camera access. Follow these steps:';
-      steps = isIOS ? (
-        <>
-          <b>iPhone / iPad:</b><br />
-          1. Open <b>Settings → Safari</b><br />
-          2. Scroll to <b>Camera → Allow</b><br />
-          3. Come back and tap <b>Retry</b>
-        </>
-      ) : (
-        <>
-          <b>Android / Chrome:</b><br />
-          1. Tap the 🔒 lock icon in the address bar<br />
-          2. Set <b>Camera → Allow</b><br />
-          3. Tap <b>Retry</b> below
-        </>
-      );
-    } else if (isNoCamera) {
-      icon = '🔍';
-      title = 'No Camera Found';
-      subtitle = 'Your device does not have a usable rear camera.';
-      steps = <>1. Make sure no other app has the camera open<br />2. Restart your browser<br />3. Try again</>;
-    } else if (isNoAPI) {
-      icon = '🔒';
-      title = 'HTTPS Required';
-      subtitle = 'Camera API is only available on secure (HTTPS) connections.';
-      steps = <>Make sure you are opening the app via <b>https://</b> and not http://</>;
-    } else {
-      // Generic / unknown — show the real error so it's debuggable
-      steps = (
-        <>
-          1. Make sure no other app is using the camera<br />
-          2. Close other browser tabs<br />
-          3. Refresh the page<br />
-          {errorDetail && (
-            <span style={{ display: 'block', marginTop: 8, fontSize: 11, color: '#ffb3b3', fontFamily: 'monospace', wordBreak: 'break-all' }}>
-              Debug: {errorDetail}
-            </span>
-          )}
-        </>
-      );
-    }
+    const { icon, title, sub, steps } = screens[errorCode] ?? screens.UNKNOWN;
 
     return (
-      <div style={{
-        padding: 24,
-        textAlign: 'center',
-        background: 'linear-gradient(135deg,#1a0a0a,#2d0f0f)',
-        color: '#fff',
-        borderRadius: 16,
-        border: '1px solid rgba(220,50,50,0.4)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-      }}>
+      <div style={{ padding: 24, textAlign: 'center', background: 'linear-gradient(135deg,#1a0a0a,#2d0f0f)', color: '#fff', borderRadius: 16, border: '1px solid rgba(220,50,50,0.4)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
         <div style={{ fontSize: 40, marginBottom: 8 }}>{icon}</div>
         <p style={{ fontWeight: 700, fontSize: 16, margin: '0 0 6px' }}>{title}</p>
-        <p style={{ fontSize: 13, color: '#ffcdd2', marginBottom: 16, lineHeight: 1.5 }}>{subtitle}</p>
-
-        <div style={{
-          background: 'rgba(255,255,255,0.08)',
-          borderRadius: 10,
-          padding: '12px 16px',
-          textAlign: 'left',
-          fontSize: 13,
-          lineHeight: 1.8,
-          marginBottom: 16,
-          color: '#fff',
-        }}>
+        <p style={{ fontSize: 13, color: '#ffcdd2', marginBottom: 16, lineHeight: 1.5 }}>{sub}</p>
+        <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 16px', textAlign: 'left', fontSize: 13, lineHeight: 1.8, marginBottom: 16, color: '#fff' }}>
           {steps}
         </div>
-
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
           <button
-            onClick={() => {
-              setErrorConfiguring(null);
-              setErrorDetail('');
-              setRetryCount(c => c + 1);
-            }}
-            style={{
-              padding: '10px 22px',
-              borderRadius: 8,
-              background: 'var(--blue, #2563eb)',
-              color: '#fff',
-              border: 'none',
-              fontWeight: 700,
-              fontSize: 14,
-              cursor: 'pointer',
-            }}
+            onClick={() => { setErrorCode(null); setDebugText(''); setRetryCount(c => c + 1); }}
+            style={{ padding: '10px 22px', borderRadius: 8, background: 'var(--blue,#2563eb)', color: '#fff', border: 'none', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
           >
             🔄 Retry
           </button>
           <button
             onClick={() => window.location.reload()}
-            style={{
-              padding: '10px 22px',
-              borderRadius: 8,
-              background: 'rgba(255,255,255,0.15)',
-              color: '#fff',
-              border: '1px solid rgba(255,255,255,0.2)',
-              fontWeight: 600,
-              fontSize: 14,
-              cursor: 'pointer',
-            }}
+            style={{ padding: '10px 22px', borderRadius: 8, background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
           >
-            ↺ Reload Page
+            ↺ Reload
           </button>
         </div>
       </div>
     );
   }
 
+  // ─── Scanner UI ─────────────────────────────────────────────────────────────
   return (
     <div style={{ position: 'relative', width: '100%', aspectRatio: '16/10', background: '#000', borderRadius: 14, overflow: 'hidden' }}>
-      <div id="reader" style={{
-        width: '100%',
-        height: '100%',
-        objectFit: 'cover',
-        filter: 'contrast(1.25) brightness(1.1) saturate(1.1)',
-      }}></div>
+      <div id="reader" style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'contrast(1.25) brightness(1.1) saturate(1.1)' }} />
       <div style={{ position: 'absolute', top: '50%', left: '10%', right: '10%', height: 2, background: 'red', boxShadow: '0 0 10px red', zIndex: 10, opacity: 0.6 }} />
-      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '90%', height: '45%', border: '2px solid var(--blue)', borderRadius: 10, boxShadow: '0 0 0 999px rgba(0,0,0,0.5)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '90%', height: '45%', border: '2px solid var(--blue)', borderRadius: 10, boxShadow: '0 0 0 999px rgba(0,0,0,0.5)', pointerEvents: 'none' }} />
 
       <div style={{ position: 'absolute', top: 10, right: 10, display: 'flex', flexDirection: 'column', gap: 8, zIndex: 20 }}>
         {hasTorch && (
-          <button className="btn btn-icon" onClick={(e) => { e.preventDefault(); setTorchOn(!torchOn); }} style={{ width: 40, height: 40, borderRadius: '50%', background: torchOn ? 'var(--blue)' : 'rgba(255,255,255,0.2)', color: '#fff', border: 'none', cursor: 'pointer' }}>
+          <button onClick={() => setTorchOn(v => !v)} style={{ width: 40, height: 40, borderRadius: '50%', background: torchOn ? 'var(--blue)' : 'rgba(255,255,255,0.2)', color: '#fff', border: 'none', cursor: 'pointer' }}>
             {torchOn ? '🔦' : '🕯️'}
           </button>
         )}
         {hasZoom && (
-          <button className="btn btn-icon" onClick={(e) => { e.preventDefault(); setZoomLevel(prev => prev >= 3 ? 1 : prev + 1); }} style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', color: '#fff', border: 'none', cursor: 'pointer' }}>
+          <button onClick={() => setZoomLevel(v => v >= 3 ? 1 : v + 1)} style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', color: '#fff', border: 'none', cursor: 'pointer' }}>
             {zoomLevel}x
           </button>
         )}
@@ -397,7 +319,7 @@ export default function BarcodeScanner({
 
       <div style={{ position: 'absolute', bottom: 10, left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 20 }}>
         <div style={{ background: 'rgba(0,0,0,0.7)', padding: '6px 14px', borderRadius: 20, color: '#fff', fontSize: 13, fontWeight: 700 }}>
-          {paused ? '⏸️ Paused' : lastScannedValue ? `✨ Scanned: ${lastScannedValue}` : `🟢 ${label}`}
+          {paused ? '⏸️ Paused' : lastScan ? `✨ Scanned: ${lastScan}` : `🟢 ${label}`}
         </div>
       </div>
     </div>
