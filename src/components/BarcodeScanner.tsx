@@ -18,6 +18,7 @@ export default function BarcodeScanner({
   debounceMs = 800,
 }: Props) {
   const [errorConfiguring, setErrorConfiguring] = useState<string | null>(null);
+  const [errorDetail, setErrorDetail] = useState<string>('');
   const [hasTorch, setHasTorch] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -37,12 +38,12 @@ export default function BarcodeScanner({
       if (decodedText.length < 4) return;
 
       if (last && last.value === decodedText && now - last.ts < (debounceMs / 2)) {
-        return; 
+        return;
       }
 
       lastScannedTS.current = { value: decodedText, ts: now };
       setLastScannedValue(decodedText);
-      
+
       setTimeout(() => setLastScannedValue(null), 600);
 
       if (!paused) {
@@ -55,29 +56,54 @@ export default function BarcodeScanner({
   useEffect(() => {
     // SSR Protection
     if (typeof window === 'undefined') return;
+    // mediaDevices not available at all (non-HTTPS or very old browser)
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setErrorConfiguring('NO_API');
+      setErrorDetail('navigator.mediaDevices is not available. Make sure you are on HTTPS.');
+      return;
+    }
 
     let scanner: any = null;
-    
+    let preflightStream: MediaStream | null = null;
+
     const startScanner = async () => {
       try {
+        // ─── STEP 1: Pre-flight getUserMedia ───────────────────────────────
+        // This is the key fix for iOS Safari. We explicitly ask for permission
+        // and get a stream BEFORE html5-qrcode tries. This:
+        //  a) triggers the iOS permission dialog correctly
+        //  b) surfaces NotAllowedError / NotFoundError cleanly
+        //  c) avoids html5-qrcode's opaque internal errors on iOS
+        try {
+          preflightStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: 'environment' } },
+            audio: false,
+          });
+          // Stop the preflight stream — html5-qrcode will open its own
+          preflightStream.getTracks().forEach((t) => t.stop());
+          preflightStream = null;
+        } catch (preflightErr: any) {
+          // Re-classify and throw so it's caught below
+          const n = preflightErr?.name ?? '';
+          if (n === 'NotAllowedError' || n === 'PermissionDeniedError') {
+            throw Object.assign(new Error('PERMISSION_DENIED'), { name: 'NotAllowedError' });
+          }
+          if (n === 'NotFoundError' || n === 'DevicesNotFoundError') {
+            throw Object.assign(new Error('NO_CAMERA_FOUND'), { name: 'NotFoundError' });
+          }
+          throw preflightErr;
+        }
+
+        // ─── STEP 2: Start html5-qrcode ───────────────────────────────────
         const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
         scanner = new Html5Qrcode('reader', {
           verbose: false,
-          experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
         });
         scannerRef.current = scanner;
 
         const beep = new Audio('https://assets.mixkit.co/active_storage/sfx/2215/2215-preview.mp3');
         beep.volume = 0.5;
-
-        // Progressive fallback: dropping 'min' constraints so even mid-range Android phones
-        // don't throw OverconstrainedError — try best quality first, step down gracefully.
-        const resolutionFallbacks = [
-          { width: { ideal: 1920 }, height: { ideal: 1080 } },
-          { width: { ideal: 1280 }, height: { ideal: 720 } },
-          { width: { ideal: 640 },  height: { ideal: 480 } },
-          {}, // bare-minimum: let browser pick anything
-        ];
 
         const scanConfig = {
           fps: 10,
@@ -100,13 +126,27 @@ export default function BarcodeScanner({
           }
         };
 
+        // Progressive resolution fallback — most critical for mid-range Androids
+        // On iOS: never pass width/height constraints, let Safari choose
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        const resolutionFallbacks = isIOS
+          ? [
+              { facingMode: { ideal: 'environment' } },              // iOS: no res constraints
+            ]
+          : [
+              { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+              { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+              { facingMode: 'environment', width: { ideal: 640 },  height: { ideal: 480 } },
+              { facingMode: 'environment' },                          // bare-minimum
+            ];
+
         let started = false;
         let lastErr: any = null;
 
-        for (const res of resolutionFallbacks) {
+        for (const constraints of resolutionFallbacks) {
           try {
             await scanner.start(
-              { facingMode: 'environment', ...res },
+              constraints,
               scanConfig,
               onScanSuccess,
               () => {}
@@ -115,13 +155,13 @@ export default function BarcodeScanner({
             break;
           } catch (err: any) {
             lastErr = err;
-            // Permission denied — no point trying lower resolutions
             if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') break;
           }
         }
 
         if (!started) throw lastErr ?? new Error('Camera unavailable');
 
+        // Torch & Zoom detection
         const stream = (scanner as any)._localMediaStream as MediaStream;
         if (stream) {
           const videoTrack = stream.getVideoTracks()[0];
@@ -133,22 +173,44 @@ export default function BarcodeScanner({
           }
         }
         setErrorConfiguring(null);
+        setErrorDetail('');
       } catch (err: any) {
+        // Stop any preflight stream if something blew up mid-flight
+        preflightStream?.getTracks().forEach((t) => t.stop());
+
         const name: string = err?.name ?? '';
         const msg: string  = err?.message ?? '';
+
         const isPermission =
           name === 'NotAllowedError' ||
           name === 'PermissionDeniedError' ||
+          msg === 'PERMISSION_DENIED' ||
           msg.toLowerCase().includes('permission') ||
           msg.toLowerCase().includes('denied') ||
           msg.toLowerCase().includes('blocked');
-        setErrorConfiguring(isPermission ? 'PERMISSION_DENIED' : (msg || 'UNKNOWN'));
+
+        const isNoCamera =
+          name === 'NotFoundError' ||
+          name === 'DevicesNotFoundError' ||
+          msg === 'NO_CAMERA_FOUND';
+
+        const isNoAPI = msg === 'navigator.mediaDevices is not available. Make sure you are on HTTPS.';
+
+        let errorCode = 'UNKNOWN';
+        if (isPermission) errorCode = 'PERMISSION_DENIED';
+        else if (isNoCamera) errorCode = 'NO_CAMERA';
+        else if (isNoAPI) errorCode = 'NO_API';
+
+        // Surface the real error for debugging
+        setErrorDetail(`[${name || 'Error'}] ${msg}`);
+        setErrorConfiguring(errorCode);
       }
     };
 
     startScanner();
 
     return () => {
+      preflightStream?.getTracks().forEach((t) => t.stop());
       if (scannerRef.current && scannerRef.current.isScanning) {
         scannerRef.current.stop().catch(() => {});
       }
@@ -173,7 +235,59 @@ export default function BarcodeScanner({
 
   if (errorConfiguring) {
     const isPermission = errorConfiguring === 'PERMISSION_DENIED';
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isNoCamera  = errorConfiguring === 'NO_CAMERA';
+    const isNoAPI     = errorConfiguring === 'NO_API';
+    const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+    let icon = '📷';
+    let title = 'Camera Error';
+    let subtitle = 'Could not start the camera.';
+    let steps: React.ReactNode = null;
+
+    if (isPermission) {
+      icon = '🚫';
+      title = 'Camera Access Blocked';
+      subtitle = 'The browser was denied camera access. Follow these steps:';
+      steps = isIOS ? (
+        <>
+          <b>iPhone / iPad:</b><br />
+          1. Open <b>Settings → Safari</b><br />
+          2. Scroll to <b>Camera → Allow</b><br />
+          3. Come back and tap <b>Retry</b>
+        </>
+      ) : (
+        <>
+          <b>Android / Chrome:</b><br />
+          1. Tap the 🔒 lock icon in the address bar<br />
+          2. Set <b>Camera → Allow</b><br />
+          3. Tap <b>Retry</b> below
+        </>
+      );
+    } else if (isNoCamera) {
+      icon = '🔍';
+      title = 'No Camera Found';
+      subtitle = 'Your device does not have a usable rear camera.';
+      steps = <>1. Make sure no other app has the camera open<br />2. Restart your browser<br />3. Try again</>;
+    } else if (isNoAPI) {
+      icon = '🔒';
+      title = 'HTTPS Required';
+      subtitle = 'Camera API is only available on secure (HTTPS) connections.';
+      steps = <>Make sure you are opening the app via <b>https://</b> and not http://</>;
+    } else {
+      // Generic / unknown — show the real error so it's debuggable
+      steps = (
+        <>
+          1. Make sure no other app is using the camera<br />
+          2. Close other browser tabs<br />
+          3. Refresh the page<br />
+          {errorDetail && (
+            <span style={{ display: 'block', marginTop: 8, fontSize: 11, color: '#ffb3b3', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+              Debug: {errorDetail}
+            </span>
+          )}
+        </>
+      );
+    }
 
     return (
       <div style={{
@@ -185,15 +299,9 @@ export default function BarcodeScanner({
         border: '1px solid rgba(220,50,50,0.4)',
         boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
       }}>
-        <div style={{ fontSize: 40, marginBottom: 8 }}>{isPermission ? '🚫' : '📷'}</div>
-        <p style={{ fontWeight: 700, fontSize: 16, margin: '0 0 6px' }}>
-          {isPermission ? 'Camera Access Blocked' : 'Camera Error'}
-        </p>
-        <p style={{ fontSize: 13, color: '#ffcdd2', marginBottom: 16, lineHeight: 1.5 }}>
-          {isPermission
-            ? 'The browser was denied camera access. Follow these steps:'
-            : 'Could not start the camera. Try the steps below:'}
-        </p>
+        <div style={{ fontSize: 40, marginBottom: 8 }}>{icon}</div>
+        <p style={{ fontWeight: 700, fontSize: 16, margin: '0 0 6px' }}>{title}</p>
+        <p style={{ fontSize: 13, color: '#ffcdd2', marginBottom: 16, lineHeight: 1.5 }}>{subtitle}</p>
 
         <div style={{
           background: 'rgba(255,255,255,0.08)',
@@ -205,36 +313,14 @@ export default function BarcodeScanner({
           marginBottom: 16,
           color: '#fff',
         }}>
-          {isPermission ? (
-            isIOS ? (
-              <>
-                <b>iPhone / iPad:</b><br />
-                1. Open <b>Settings → Safari</b><br />
-                2. Tap <b>Camera → Allow</b><br />
-                3. Come back and tap <b>Retry</b>
-              </>
-            ) : (
-              <>
-                <b>Android / Chrome:</b><br />
-                1. Tap the 🔒 lock icon in the address bar<br />
-                2. Set <b>Camera → Allow</b><br />
-                3. Tap <b>Retry</b> below<br />
-                <span style={{ color: '#ffb3b3' }}>⚠️ Must be on HTTPS, not http://</span>
-              </>
-            )
-          ) : (
-            <>
-              1. Make sure no other app is using the camera<br />
-              2. Refresh the page<br />
-              3. Allow camera when the browser asks
-            </>
-          )}
+          {steps}
         </div>
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
           <button
             onClick={() => {
               setErrorConfiguring(null);
+              setErrorDetail('');
               setRetryCount(c => c + 1);
             }}
             style={{
@@ -272,12 +358,11 @@ export default function BarcodeScanner({
 
   return (
     <div style={{ position: 'relative', width: '100%', aspectRatio: '16/10', background: '#000', borderRadius: 14, overflow: 'hidden' }}>
-      {/* Dual-Engine Mount with Contrast Boost */}
-      <div id="reader" style={{ 
-        width: '100%', 
-        height: '100%', 
-        objectFit: 'cover', 
-        filter: 'contrast(1.25) brightness(1.1) saturate(1.1)' 
+      <div id="reader" style={{
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        filter: 'contrast(1.25) brightness(1.1) saturate(1.1)',
       }}></div>
       <div style={{ position: 'absolute', top: '50%', left: '10%', right: '10%', height: 2, background: 'red', boxShadow: '0 0 10px red', zIndex: 10, opacity: 0.6 }} />
       <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '90%', height: '45%', border: '2px solid var(--blue)', borderRadius: 10, boxShadow: '0 0 0 999px rgba(0,0,0,0.5)', pointerEvents: 'none' }} />
@@ -290,7 +375,7 @@ export default function BarcodeScanner({
         )}
         {hasZoom && (
           <button className="btn btn-icon" onClick={(e) => { e.preventDefault(); setZoomLevel(prev => prev >= 3 ? 1 : prev + 1); }} style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', color: '#fff', border: 'none', cursor: 'pointer' }}>
-                          {zoomLevel}x
+            {zoomLevel}x
           </button>
         )}
       </div>
