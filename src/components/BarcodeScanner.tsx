@@ -149,9 +149,10 @@ export default function BarcodeScanner({
             if (stoppedRef.current) return;
             const v = videoRef.current;
             if (v && ctx && v.readyState >= 2 && v.videoWidth > 0) {
-              canvas.width  = v.videoWidth;
-              canvas.height = v.videoHeight;
-              ctx.drawImage(v, 0, 0);
+              const scale = Math.min(1, 640 / v.videoWidth);
+              canvas.width  = v.videoWidth * scale;
+              canvas.height = v.videoHeight * scale;
+              ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
               try {
                 // decodeFromCanvas is synchronous — no async timing issues
                 const result = (reader as any).decodeFromCanvas(canvas);

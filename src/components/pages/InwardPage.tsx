@@ -8,6 +8,7 @@ import type { AppSettings, InwardBatch } from '@/lib/types';
 import dynamic from 'next/dynamic';
 const BarcodeScanner = dynamic(() => import('../BarcodeScanner'), { ssr: false });
 import Toast from '../Toast';
+import ExcelUpload from '../ExcelUpload';
 
 const BRANDS = [
   { name: 'Lloyd', icon: '❄️', image: '/brands/lloyd.png' },
@@ -109,6 +110,7 @@ export default function InwardPage() {
           <div className="page-header-title">📥 Inward Stock</div>
           <div className="page-header-sub">Scan received stock into inventory</div>
         </div>
+        <ExcelUpload onComplete={(msg) => addToast(msg.includes('✅') ? 'success' : 'error', msg)} />
       </div>
 
       <div className="page-body">

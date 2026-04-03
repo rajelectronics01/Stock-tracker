@@ -171,11 +171,10 @@ export async function saveInwardBatch(
 ): Promise<{ added: number; skipped: string[] }> {
   const skipped: string[] = [];
 
-  // 1. Upsert the inward_batch record
+  // 1. Insert the inward_batch record without an explicit ID so DB auto-generates it
   const { error: batchError } = await supabase
     .from('inward_batches')
-    .upsert({
-      id: batch.id,
+    .insert({
       date: batch.date,
       godown: batch.godown,
       brand: batch.brand,
@@ -235,14 +234,44 @@ export async function getInwardBatches(): Promise<InwardBatch[]> {
   }));
 }
 
+export async function bulkExcelImport(
+  items: { serialNo: string, brand: string, model: string, godown: string }[],
+  staffId: string
+): Promise<{ added: number, skipped: number }> {
+  if (items.length === 0) return { added: 0, skipped: 0 };
+  
+  const rows = items.map(i => ({
+    serial_no: i.serialNo,
+    brand: i.brand,
+    model: i.model,
+    godown: i.godown || 'Main Godown',
+    status: 'IN STOCK',
+    inward_date: new Date().toISOString(),
+    staff_id: staffId
+  }));
+
+  const { data: inserted, error } = await supabase
+    .from('inventory')
+    .upsert(rows, { onConflict: 'serial_no', ignoreDuplicates: true })
+    .select('serial_no');
+
+  if (error) {
+    console.error('bulkExcelImport error', error);
+    throw new Error('Database error during bulk import.');
+  }
+
+  const added = inserted?.length ?? 0;
+  const skipped = items.length - added;
+  return { added, skipped };
+}
+
 // ── OUTWARD (Supabase) ────────────────────────────────
 
 export async function saveOutwardBatch(batch: OutwardBatch): Promise<void> {
-  // 1. Upsert the outward_batch record
+  // 1. Insert the outward_batch record without an explicit ID
   const { error: batchError } = await supabase
     .from('outward_batches')
-    .upsert({
-      id: batch.id,
+    .insert({
       date: batch.date,
       challan_no: batch.challanNo,
       buyer_name: batch.buyerName,
