@@ -14,7 +14,7 @@ export default function LoginPage() {
 
   ensureSeeded();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id.trim() || !password.trim()) {
       setError('Enter both ID and Password');
@@ -23,13 +23,17 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     
-    setTimeout(() => {
-      const result = login(id.trim(), password);
+    try {
+      const result = await login(id.trim(), password);
+      // login handles the redirection/state on success
       if (!result.ok) {
         setError(result.error || 'Invalid credentials');
         setLoading(false);
       }
-    }, 600);
+    } catch (err: any) {
+      setError('Login connection error');
+      setLoading(false);
+    }
   };
 
   return (
