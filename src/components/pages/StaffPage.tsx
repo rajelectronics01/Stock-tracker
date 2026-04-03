@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getUsers, saveUsers, simpleHash, getSettings } from '@/lib/store';
+import { getUsers, saveUser, deleteUser, simpleHash, syncLocalUsersToCloud } from '@/lib/store';
 import type { User } from '@/lib/types';
 import Toast from '../Toast';
 
@@ -23,20 +23,32 @@ export default function StaffPage() {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
   };
 
-  useEffect(() => { setUsers(getUsers()); }, []);
-
-  const reload = () => setUsers(getUsers());
-
-  const addEmployee = () => {
+  useEffect(() => {
+    const initData = async () => {
+      // Sync local to cloud once
+      try {
+        const local = JSON.parse(localStorage.getItem('re_users') || '[]');
+        if (local.length > 0) {
+          addToast('success', `☁️ Syncing ${local.length} staff accounts to cloud...`);
+          await syncLocalUsersToCloud();
+          addToast('success', '✅ Staff sync complete. You can now log in on mobile!');
+        }
+      } catch (e) {
+        console.error('Sync failed', e);
+      }
+      const all = await getUsers();
+      setUsers(all);
+    };
+    initData();
+  }, []);
+  
+  const reload = async () => setUsers(await getUsers());
+  
+  const addEmployee = async () => {
     const trimmedId = newUserId.trim().toUpperCase();
     if (!newName.trim() || !trimmedId || !newPwd.trim()) {
       addToast('error', 'Username, Name and Password are required.'); return;
     }
-    const all = getUsers();
-    if (all.some(u => u.id.toUpperCase() === trimmedId)) {
-      addToast('error', 'Username/ID already exists.'); return;
-    }
-
     const user: User = {
       id: trimmedId,
       name: newName.trim(),
@@ -45,42 +57,38 @@ export default function StaffPage() {
       active: true,
       createdAt: new Date().toISOString(),
     };
-    all.push(user);
-    saveUsers(all);
-    reload();
+    await saveUser(user);
+    await reload();
     addToast('success', `✅ User ${trimmedId} created successfully.`);
     setNewName(''); setNewUserId(''); setNewPwd(''); setShowAdd(false);
   };
 
-  const toggleActive = (id: string) => {
-    const all = getUsers();
-    const idx = all.findIndex(u => u.id === id);
-    if (idx !== -1) {
-      all[idx].active = !all[idx].active;
-      saveUsers(all);
-      reload();
-      addToast('success', `Account ${all[idx].active ? 'activated' : 'deactivated'}.`);
+  const toggleActive = async (id: string) => {
+    const found = users.find(u => u.id === id);
+    if (found) {
+      found.active = !found.active;
+      await saveUser(found);
+      await reload();
+      addToast('success', `Account ${found.active ? 'activated' : 'deactivated'}.`);
     }
   };
 
-  const handleResetPassword = () => {
+  const handleResetPassword = async () => {
     if (!resetPwdVal.trim()) { addToast('error', 'Enter a new password.'); return; }
-    const all = getUsers();
-    const idx = all.findIndex(u => u.id === resetPwdFor);
-    if (idx !== -1) {
-      all[idx].passwordHash = simpleHash(resetPwdVal);
-      saveUsers(all);
-      reload();
+    const found = users.find(u => u.id === resetPwdFor);
+    if (found) {
+      found.passwordHash = simpleHash(resetPwdVal);
+      await saveUser(found);
+      await reload();
       addToast('success', 'Password updated.');
       setResetPwdFor(null); setResetPwdVal('');
     }
   };
 
-  const deleteEmployee = (id: string) => {
+  const deleteEmployee = async (id: string) => {
     if (!confirm(`Delete employee ${id}? This cannot be undone.`)) return;
-    const all = getUsers().filter(u => u.id !== id);
-    saveUsers(all);
-    reload();
+    await deleteUser(id);
+    await reload();
     addToast('success', 'Employee deleted.');
   };
 

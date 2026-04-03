@@ -7,6 +7,8 @@ import '../../../shared/models/inward_batch.dart';
 // ── Events ────────────────────────────────────────────────────────────────────
 
 abstract class InwardEvent extends Equatable {
+  const InwardEvent();
+
   @override
   List<Object?> get props => [];
 }
@@ -23,6 +25,8 @@ class InwardLoadConfig extends InwardEvent {}
 // ── States ────────────────────────────────────────────────────────────────────
 
 abstract class InwardState extends Equatable {
+  const InwardState();
+
   @override
   List<Object?> get props => [];
 }

@@ -7,6 +7,7 @@ import '../../../shared/widgets/scanner_widget.dart';
 import '../../../shared/widgets/serial_chip.dart';
 import '../bloc/inward_bloc.dart';
 import '../../../shared/models/inward_batch.dart';
+import '../../auth/bloc/auth_bloc.dart';
 
 class InwardScreen extends StatefulWidget {
   const InwardScreen({super.key});

@@ -1,14 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants.dart';
 
 /// Handles staff authentication against the custom `employees` Supabase table.
-///
-/// NOTE: We intentionally do NOT use Supabase Auth (email/password sign-in)
-/// because staff accounts are managed via the admin dashboard using a plain
-/// `employees` table with emp_id + password columns.  Supabase Auth rows are
-/// a different concept and unrelated here.
 class AuthRepository {
   final _supabase = Supabase.instance.client;
 
@@ -28,9 +22,6 @@ class AuthRepository {
   // ── Login ─────────────────────────────────────────────────────────────────
 
   /// Finds the employee by [username] (emp_id) and verifies [password].
-  ///
-  /// Returns `true` on success, `false` on bad credentials, and throws on
-  /// network / database errors so the calling BLoC can surface them.
   Future<bool> login(String username, String password) async {
     debugPrint('[AuthRepository] login() called for emp_id: $username');
 
@@ -40,6 +31,21 @@ class AuthRepository {
     if (trimmedId.isEmpty || trimmedPw.isEmpty) {
       debugPrint('[AuthRepository] login() – empty username or password');
       return false;
+    }
+
+    final String passwordHash = _simpleHash(trimmedPw);
+
+    // ── Admin Fallback (Matches Next.js logic) ──────────────────────────
+    // This allows the admin to log in even if the database is being setup.
+    if (trimmedId.toUpperCase() == 'ADMIN' && (trimmedPw == 'admin123' || passwordHash == _simpleHash('admin123'))) {
+      _currentEmployee = {
+        'emp_id': 'ADMIN',
+        'name': 'Administrator',
+        'role': 'admin',
+        'active': true,
+      };
+      debugPrint('[AuthRepository] login() – SUCCESS (Admin Fallback)');
+      return true;
     }
 
     try {
@@ -57,16 +63,16 @@ class AuthRepository {
 
       final Map<String, dynamic> emp = rows.first as Map<String, dynamic>;
 
-      // Verify password. The DB stores the password as plain-text (per the
-      // existing admin dashboard design). If you later add hashing, update
-      // this comparison accordingly.
+      // Verify password. The DB stores the hashed password (to match Next.js simpleHash).
       final String? storedPw = emp['password'] as String?;
-      if (storedPw == null || storedPw != trimmedPw) {
+      
+      // Allow both plain-text (for migration) and hashed passwords
+      if (storedPw == null || (storedPw != trimmedPw && storedPw != passwordHash)) {
         debugPrint('[AuthRepository] login() – password mismatch for: $trimmedId');
         return false;
       }
 
-      // Check active flag (optional – only applies when the column exists).
+      // Check active flag
       final dynamic activeFlag = emp['active'];
       if (activeFlag != null && activeFlag == false) {
         debugPrint('[AuthRepository] login() – account deactivated: $trimmedId');
@@ -76,8 +82,11 @@ class AuthRepository {
       _currentEmployee = emp;
       debugPrint('[AuthRepository] login() – SUCCESS for: $trimmedId');
       return true;
-    } on Exception {
-      rethrow; // Let the BLoC handle and display the error
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST205' || e.code == '42P01') {
+        throw Exception('Database Error: Table "employees" is missing in Supabase. Run the SQL script from the dashboard.');
+      }
+      rethrow;
     } catch (e, st) {
       debugPrint('[AuthRepository] login() – unexpected error: $e\n$st');
       throw Exception('Login failed. Please check your connection and try again.');
@@ -89,6 +98,19 @@ class AuthRepository {
   Future<void> logout() async {
     debugPrint('[AuthRepository] logout() called');
     _currentEmployee = null;
-    // No Supabase Auth session to sign out of; we manage auth state ourselves.
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  /// Matching implementation of the Next.js `simpleHash` function.
+  String _simpleHash(String str) {
+    int hash = 0;
+    for (int i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.codeUnitAt(i);
+      hash = hash & 0xFFFFFFFF; // Ensure 32-bit integer behavior
+    }
+    // Handle signed 32-bit behavior like JavaScript '| 0'
+    if (hash > 0x7FFFFFFF) hash -= 0x100000000;
+    return hash.toString();
   }
 }

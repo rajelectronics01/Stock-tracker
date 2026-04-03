@@ -7,6 +7,8 @@ import '../../../shared/models/outward_batch.dart';
 // ── Events ────────────────────────────────────────────────────────────────────
 
 abstract class OutwardEvent extends Equatable {
+  const OutwardEvent();
+
   @override
   List<Object?> get props => [];
 }
@@ -28,6 +30,8 @@ class OutwardSaveRequested extends OutwardEvent {
 // ── States ────────────────────────────────────────────────────────────────────
 
 abstract class OutwardState extends Equatable {
+  const OutwardState();
+
   @override
   List<Object?> get props => [];
 }

@@ -6,6 +6,8 @@ import '../data/auth_repository.dart';
 // ── Events ────────────────────────────────────────────────────────────────────
 
 abstract class AuthEvent extends Equatable {
+  const AuthEvent();
+
   @override
   List<Object?> get props => [];
 }
@@ -28,6 +30,8 @@ class AuthLogoutRequested extends AuthEvent {}
 // ── States ────────────────────────────────────────────────────────────────────
 
 abstract class AuthState extends Equatable {
+  const AuthState();
+
   @override
   List<Object?> get props => [];
 }

@@ -67,13 +67,66 @@ export function saveModelToBrand(brand: string, model: string): void {
   }
 }
 
-// ── USERS (localStorage only) ─────────────────────────
-export function getUsers(): User[] {
-  return get<User[]>(KEYS.users, []);
+// ── USERS (Supabase) ──────────────────────────────────
+export async function getUsers(): Promise<User[]> {
+  const { data, error } = await supabase
+    .from('employees')
+    .select('*')
+    .order('created_at', { ascending: false });
+  
+  if (error) {
+    if (error.code === 'PGRST116' || error.code === '42P01') {
+      console.warn('Employees table not found. Please create it in Supabase.');
+    } else {
+      console.error('getUsers error:', error);
+    }
+    return [];
+  }
+
+  return (data || []).map((r: any): User => ({
+    id: r.emp_id,
+    name: r.name,
+    role: 'employee',
+    passwordHash: r.password,
+    active: r.active !== false,
+    createdAt: r.created_at,
+    lastLogin: r.last_login,
+  }));
 }
 
-export function saveUsers(users: User[]): void {
-  set(KEYS.users, users);
+export async function saveUser(user: User): Promise<void> {
+  const { error } = await supabase
+    .from('employees')
+    .upsert({
+      emp_id: user.id,
+      name: user.name,
+      password: user.passwordHash,
+      active: user.active,
+      created_at: user.createdAt || new Date().toISOString(),
+      last_login: user.lastLogin,
+    });
+  if (error) console.error('saveUser error:', error);
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('employees')
+    .delete()
+    .eq('emp_id', id);
+  if (error) console.error('deleteUser error:', error);
+}
+
+/** Migration helper to push local users to Supabase */
+export async function syncLocalUsersToCloud(): Promise<void> {
+  const local = get<User[]>(KEYS.users, []);
+  if (local.length === 0) return;
+
+  for (const u of local) {
+    await saveUser(u);
+  }
+  
+  // Clear local storage after sync
+  localStorage.removeItem(KEYS.users);
 }
 
 

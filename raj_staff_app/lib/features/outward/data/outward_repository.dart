@@ -49,7 +49,7 @@ class OutwardRepository {
             'outward_challan': batch.challanNo,
             'sold_to': batch.buyerName,
           })
-          .in_('serial_no', batch.serialNos);
+          .inFilter('serial_no', batch.serialNos);
 
       debugPrint(
         '[OutwardRepository] saveOutward() – ${batch.serialNos.length} '
