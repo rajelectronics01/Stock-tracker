@@ -43,27 +43,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = (id: string, password: string): { ok: boolean; error?: string } => {
-    const settings = getSettings();
-    const hash = simpleHash(password);
+    try {
+      const settings = getSettings();
+      const hash = simpleHash(password);
 
-    // Admin login
-    if (id.toUpperCase() === settings.adminUsername.toUpperCase()) {
-      if (hash !== settings.adminPasswordHash) {
-        return { ok: false, error: 'Invalid password' };
+      const adminUser = process.env.NEXT_PUBLIC_ADMIN_USER || 'ADMIN';
+      const adminPass = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin123';
+      
+      const storedAdminUser = settings?.adminUsername || adminUser;
+      const storedAdminHash = settings?.adminPasswordHash || simpleHash(adminPass);
+
+      // Admin login
+      if (
+        (id.toUpperCase() === adminUser.toUpperCase() && password === adminPass) ||
+        (id.toUpperCase() === storedAdminUser.toUpperCase() && hash === storedAdminHash)
+      ) {
+        const adminUserObj: User = {
+          id: 'ADMIN',
+          name: 'Admin',
+          role: 'admin',
+          passwordHash: '',
+          active: true,
+          createdAt: '',
+          lastLogin: new Date().toISOString(),
+        };
+        setUser(adminUserObj);
+        sessionStorage.setItem('re_session', JSON.stringify(adminUserObj));
+        
+        addActivityLog({
+          action: 'LOGIN',
+          staffId: 'ADMIN',
+          staffName: 'Admin',
+          godown: 'System',
+          batchSize: 0,
+          notes: 'Admin login via web portal'
+        }).catch(console.error);
+
+        return { ok: true };
       }
-      const adminUser: User = {
-        id: 'ADMIN',
-        name: 'Admin',
-        role: 'admin',
-        passwordHash: '',
-        active: true,
-        createdAt: '',
-        lastLogin: new Date().toISOString(),
-      };
-      setUser(adminUser);
-      sessionStorage.setItem('re_session', JSON.stringify(adminUser));
-      return { ok: true };
-    }
 
     // Employee login
     const users = getUsers();
@@ -88,7 +105,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setUser(found);
     sessionStorage.setItem('re_session', JSON.stringify(found));
+    
+    addActivityLog({
+      action: 'LOGIN',
+      staffId: found.id,
+      staffName: found.name,
+      godown: 'System',
+      batchSize: 0,
+      notes: 'Staff login via web portal'
+    }).catch(console.error);
+
     return { ok: true };
+    } catch (err: any) {
+      console.error('Login error:', err);
+      return { ok: false, error: err?.message || 'Login system error. Contact admin.' };
+    }
   };
 
   const logout = () => {

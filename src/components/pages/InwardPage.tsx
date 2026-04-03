@@ -82,12 +82,12 @@ export default function InwardPage() {
     const batch: InwardBatch = {
       id: Date.now().toString(), date: batchDate, godown, brand: product.brand,
       model: product.model, category: product.category || 'General', hsnCode: product.hsnCode,
-      staffId: user?.id || '', staffName: user?.id || '', serialNos, createdAt: new Date().toISOString(),
+      staffId: user?.id || '', staffName: user?.name || '', serialNos, createdAt: new Date().toISOString(),
     };
     const { added, skipped } = await saveInwardBatch(batch);
     saveModelToBrand(product.brand, product.model);
     await addActivityLog({
-      action: 'INWARD', staffId: user?.id || '', staffName: user?.id || '',
+      action: 'INWARD', staffId: user?.id || '', staffName: user?.name || '',
       godown, batchSize: added, notes: `Inward: ${product.brand} ${product.model}`
     });
     if (skipped.length > 0) {

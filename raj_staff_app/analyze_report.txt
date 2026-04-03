@@ -1,0 +1,20 @@
+Analyzing raj_staff_app...                                      
+
+warning - Unused import: '../data/auth_repository.dart' - lib\features\auth\data\auth_repository.dart:2:8 - unused_import
+warning - The value of the local variable 'response' isn't used - lib\features\inward\data\inward_repository.dart:9:13 - unused_local_variable
+  error - The getter 'batchNo' isn't defined for the type 'InwardBatch' - lib\features\inward\data\inward_repository.dart:12:31 - undefined_getter
+  error - The getter 'itemType' isn't defined for the type 'InwardBatch' - lib\features\inward\data\inward_repository.dart:14:32 - undefined_getter
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\features\inward\screens\inward_screen.dart:148:19 - deprecated_member_use
+   info - Use 'const' with the constructor to improve performance - lib\features\inward\screens\inward_screen.dart:216:21 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\inward\screens\inward_screen.dart:216:67 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\inward\screens\inward_screen.dart:216:79 - prefer_const_constructors
+warning - The operand can't be 'null', so the condition is always 'true' - lib\features\outward\bloc\outward_bloc.dart:64:15 - unnecessary_null_comparison
+  error - The operator '[]' isn't defined for the type 'bool' - lib\features\outward\bloc\outward_bloc.dart:64:29 - undefined_operator
+warning - The receiver can't be null, so the null-aware operator '?[' is unnecessary - lib\features\outward\bloc\outward_bloc.dart:67:65 - invalid_null_aware_operator
+  error - The operator '[]' isn't defined for the type 'bool' - lib\features\outward\bloc\outward_bloc.dart:67:66 - undefined_operator
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\features\outward\screens\outward_screen.dart:132:19 - deprecated_member_use
+   info - Use 'const' with the constructor to improve performance - lib\features\outward\screens\outward_screen.dart:218:21 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\outward\screens\outward_screen.dart:218:67 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\outward\screens\outward_screen.dart:218:79 - prefer_const_constructors
+warning - Unused import: 'package:flutter/material.dart' - test\widget_test.dart:1:8 - unused_import
+

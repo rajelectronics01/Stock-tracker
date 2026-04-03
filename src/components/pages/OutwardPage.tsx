@@ -55,7 +55,7 @@ export default function OutwardPage({ setPage }: { setPage: (p: string) => void 
   const buildBatch = (): OutwardBatch => ({
     id: Date.now().toString(), date: form.date, challanNo: form.challanNo,
     buyerName: form.buyerName, buyerGstin: form.buyerGstin,
-    saleType: form.saleType, transport: form.transport, handedBy: user?.id || '', staffId: user?.id || '',
+    saleType: form.saleType, transport: form.transport, handedBy: user?.name || '', staffId: user?.id || '',
     remarks: form.remarks,
     serialNos: scannedItems.map(i => i.serialNo), createdAt: new Date().toISOString(),
   });

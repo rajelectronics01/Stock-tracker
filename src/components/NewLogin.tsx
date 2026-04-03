@@ -13,12 +13,18 @@ export default function NewLogin() {
   
   ensureSeeded();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if(!id || !password) return setError('Missing ID or Password');
     setLoading(true);
-    const res = login(id, password);
-    if (!res.ok) { setError(res.error || 'Login Failed'); setLoading(false); }
+    try {
+      const res = await login(id, password);
+      if (!res.ok) { setError(res.error || 'Login Failed'); }
+    } catch (err: any) {
+      setError(err?.message || 'Login Failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
