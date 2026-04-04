@@ -20,7 +20,9 @@ class InwardSaveRequested extends InwardEvent {
   List<Object?> get props => [batch];
 }
 
-class InwardLoadConfig extends InwardEvent {}
+class InwardLoadConfig extends InwardEvent {
+  const InwardLoadConfig();
+}
 
 // ── States ────────────────────────────────────────────────────────────────────
 
@@ -31,9 +33,13 @@ abstract class InwardState extends Equatable {
   List<Object?> get props => [];
 }
 
-class InwardInitial extends InwardState {}
+class InwardInitial extends InwardState {
+  const InwardInitial();
+}
 
-class InwardLoading extends InwardState {}
+class InwardLoading extends InwardState {
+  const InwardLoading();
+}
 
 class InwardConfigLoaded extends InwardState {
   final List<String> godowns;
@@ -75,7 +81,7 @@ class InwardBloc extends Bloc<InwardEvent, InwardState> {
       } catch (e) {
         debugPrint('[InwardBloc] getGodowns error: $e – using defaults');
         // Non-critical: fall back to defaults instead of showing error
-        emit(const InwardConfigLoaded(['Main Godown', 'Showroom']));
+        emit(InwardConfigLoaded(['Main Godown', 'Showroom']));
       }
     });
 
@@ -94,7 +100,7 @@ class InwardBloc extends Bloc<InwardEvent, InwardState> {
           debugPrint('[InwardBloc] Save SUCCESS');
           emit(InwardSaveSuccess(event.batch.serialNos.length));
         } else {
-          emit(const InwardError('Save returned false. Please try again.'));
+          emit(InwardError('Save returned false. Please try again.'));
         }
       } on Exception catch (e) {
         final msg = e.toString().replaceFirst('Exception: ', '');
@@ -102,7 +108,7 @@ class InwardBloc extends Bloc<InwardEvent, InwardState> {
         emit(InwardError(msg));
       } catch (e, st) {
         debugPrint('[InwardBloc] Save UNEXPECTED ERROR – $e\n$st');
-        emit(const InwardError('An unexpected error occurred. Please try again.'));
+        emit(InwardError('An unexpected error occurred. Please try again.'));
       }
     });
   }

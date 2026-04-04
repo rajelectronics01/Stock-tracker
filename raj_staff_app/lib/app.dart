@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/theme.dart';
 import 'core/router.dart';
 import 'features/auth/bloc/auth_bloc.dart';
+import 'features/inward/bloc/inward_bloc.dart';
+import 'features/outward/bloc/outward_bloc.dart';
 import 'package:get_it/get_it.dart';
 
 class RajStaffApp extends StatelessWidget {
@@ -12,7 +14,9 @@ class RajStaffApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider(create: (context) => GetIt.instance<AuthBloc>()..add(AuthCheckStatus())),
+        BlocProvider(create: (_) => GetIt.instance<AuthBloc>()..add(AuthCheckStatus())),
+        BlocProvider(create: (_) => GetIt.instance<InwardBloc>()),
+        BlocProvider(create: (_) => GetIt.instance<OutwardBloc>()),
       ],
       child: MaterialApp.router(
         title: 'Raj Staff App',

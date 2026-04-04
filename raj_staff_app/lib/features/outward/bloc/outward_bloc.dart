@@ -36,9 +36,13 @@ abstract class OutwardState extends Equatable {
   List<Object?> get props => [];
 }
 
-class OutwardInitial extends OutwardState {}
+class OutwardInitial extends OutwardState {
+  const OutwardInitial();
+}
 
-class OutwardVerifying extends OutwardState {}
+class OutwardVerifying extends OutwardState {
+  const OutwardVerifying();
+}
 
 class OutwardVerifyResult extends OutwardState {
   final String serial;
@@ -57,7 +61,9 @@ class OutwardVerifyResult extends OutwardState {
   List<Object?> get props => [serial, isValid, errorMessage, itemData];
 }
 
-class OutwardLoading extends OutwardState {}
+class OutwardLoading extends OutwardState {
+  const OutwardLoading();
+}
 
 class OutwardSaveSuccess extends OutwardState {
   final String challanNo;
@@ -115,7 +121,7 @@ class OutwardBloc extends Bloc<OutwardEvent, OutwardState> {
           debugPrint('[OutwardBloc] Save SUCCESS – challan=${event.batch.challanNo}');
           emit(OutwardSaveSuccess(event.batch.challanNo));
         } else {
-          emit(const OutwardError('Failed to save dispatch. Please try again.'));
+          emit(OutwardError('Failed to save dispatch. Please try again.'));
         }
       } on Exception catch (e) {
         final msg = e.toString().replaceFirst('Exception: ', '');
@@ -123,7 +129,7 @@ class OutwardBloc extends Bloc<OutwardEvent, OutwardState> {
         emit(OutwardError(msg));
       } catch (e, st) {
         debugPrint('[OutwardBloc] Save UNEXPECTED ERROR – $e\n$st');
-        emit(const OutwardError('An unexpected error occurred. Please try again.'));
+        emit(OutwardError('An unexpected error occurred. Please try again.'));
       }
     });
   }

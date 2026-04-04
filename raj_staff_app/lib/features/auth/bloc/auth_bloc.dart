@@ -13,7 +13,9 @@ abstract class AuthEvent extends Equatable {
 }
 
 /// Fired on app startup to restore any persisted session.
-class AuthCheckStatus extends AuthEvent {}
+class AuthCheckStatus extends AuthEvent {
+  const AuthCheckStatus();
+}
 
 /// Fired when the user taps "Login".
 class AuthLoginRequested extends AuthEvent {
@@ -25,7 +27,9 @@ class AuthLoginRequested extends AuthEvent {
 }
 
 /// Fired when the user taps "Logout".
-class AuthLogoutRequested extends AuthEvent {}
+class AuthLogoutRequested extends AuthEvent {
+  const AuthLogoutRequested();
+}
 
 // ── States ────────────────────────────────────────────────────────────────────
 
@@ -36,9 +40,13 @@ abstract class AuthState extends Equatable {
   List<Object?> get props => [];
 }
 
-class AuthInitial extends AuthState {}
+class AuthInitial extends AuthState {
+  const AuthInitial();
+}
 
-class AuthLoading extends AuthState {}
+class AuthLoading extends AuthState {
+  const AuthLoading();
+}
 
 class AuthAuthenticated extends AuthState {
   final String userId;
@@ -48,7 +56,9 @@ class AuthAuthenticated extends AuthState {
   List<Object?> get props => [userId, displayName];
 }
 
-class AuthUnauthenticated extends AuthState {}
+class AuthUnauthenticated extends AuthState {
+  const AuthUnauthenticated();
+}
 
 class AuthError extends AuthState {
   final String message;

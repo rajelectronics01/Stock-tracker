@@ -1,0 +1,42 @@
+name: Build Android APK
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'raj_staff_app/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x' # Or whatever stable version they are on
+          channel: 'stable'
+
+      - name: Install dependencies
+        working-directory: ./raj_staff_app
+        run: flutter pub get
+
+      - name: Build APK (Fat)
+        working-directory: ./raj_staff_app
+        run: flutter build apk --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: raj-staff-app-apk
+          path: raj_staff_app/build/app/outputs/flutter-apk/app-release.apk
