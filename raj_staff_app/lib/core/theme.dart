@@ -22,7 +22,7 @@ class AppTheme {
       brightness: Brightness.dark,
       scaffoldBackgroundColor: darkBg,
       primaryColor: blue,
-      cardTheme: CardThemeData(
+      cardTheme: CardTheme(
         color: surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
