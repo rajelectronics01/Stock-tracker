@@ -11,21 +11,23 @@ interface Props {
 
 declare const BarcodeDetector: any;
 
-// ── Valid serial characters: alphanumeric + hyphen + slash + dot ─────────────
-const VALID_SERIAL_RE = /^[A-Z0-9\-\/\.]+$/i;
+// ── Lightweight pre-validation only (parser does deep cleanup later) ─────────
+const MIN_SERIAL_LEN = 3;
+const MAX_SERIAL_LEN = 128;
 
 export default function BarcodeScanner({
   onScan,
   paused = false,
   label = 'Align barcode in frame',
-  debounceMs = 2000,
+  debounceMs = 900,
 }: Props) {
-  const videoRef     = useRef<HTMLVideoElement>(null);
-  const canvasRef    = useRef<HTMLCanvasElement>(null);
-  const streamRef    = useRef<MediaStream | null>(null);
-  const timerRef     = useRef<any>(null);
-  const cooldownRef  = useRef<number>(0);
-  const stoppedRef   = useRef(false);
+  const videoRef      = useRef<HTMLVideoElement>(null);
+  const canvasRef     = useRef<HTMLCanvasElement>(null);
+  const streamRef     = useRef<MediaStream | null>(null);
+  const timerRef      = useRef<any>(null);
+  const lastValueRef  = useRef<string>('');
+  const lastValueAtRef = useRef<number>(0);
+  const stoppedRef    = useRef(false);
 
   const [errorCode, setErrorCode]   = useState<string | null>(null);
   const [debugText, setDebugText]   = useState('');
@@ -33,25 +35,21 @@ export default function BarcodeScanner({
   const [lastScan, setLastScan]     = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
-  // ─── Scan handler — hard cooldown, character validation ──────────────────
+  // ─── Scan handler — same-value cooldown + lightweight length guard ─────────
   const handleDetected = useCallback((raw: string) => {
-    if (!raw) return;
+    if (!raw || paused) return;
     const text = raw.trim().toUpperCase();
 
-    // Minimum 6 chars
-    if (text.length < 6) return;
+    if (text.length < MIN_SERIAL_LEN || text.length > MAX_SERIAL_LEN) return;
 
-    // Reject garbled reads: must be alphanumeric + hyphen/slash/dot only
-    if (!VALID_SERIAL_RE.test(text)) return;
-
-    // Hard cooldown (ref-based = synchronous, immune to React batching)
     const now = Date.now();
-    if (now < cooldownRef.current) return;
-    cooldownRef.current = now + debounceMs;
+    if (text === lastValueRef.current && now - lastValueAtRef.current < debounceMs) return;
+    lastValueRef.current = text;
+    lastValueAtRef.current = now;
 
     setLastScan(text);
     setTimeout(() => setLastScan(null), 900);
-    if (!paused) onScan(text);
+    onScan(text);
   }, [onScan, paused, debounceMs]);
 
   useEffect(() => {

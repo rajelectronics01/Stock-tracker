@@ -1,20 +1,46 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth-context';
-import { getItemBySerial, saveOutwardBatch, generateChallanNo, addActivityLog, getSettings } from '@/lib/store';
+import {
+  getItemBySerial,
+  saveOutwardBatch,
+  generateChallanNo,
+  addActivityLog,
+  getSettings,
+  flushOfflineQueue,
+  getOfflineQueueCount,
+  isOfflineMode,
+} from '@/lib/store';
 import type { OutwardBatch, InventoryItem } from '@/lib/types';
 import Toast from '../Toast';
 import ChallanModal from '../ChallanModal';
+import { parseBarcode } from '@/lib/barcode-parser';
+import { useHidScannerCapture } from '@/hooks/useHidScannerCapture';
 
 const BarcodeScanner = dynamic(() => import('../BarcodeScanner'), { ssr: false });
 
 const SALE_TYPES = ['Retail Sale', 'Dealer Transfer', 'Service Return', 'Replacement'];
 const TRANSPORT = ['Own Vehicle', 'Dealer Pickup', 'Courier', 'Hand Delivery'];
-const GST_RATES = [0, 5, 12, 18, 28];
+const MIN_SERIAL_LEN = 3;
+const MAX_SERIAL_LEN = 128;
+
+const normalizeSerial = (raw: string): string => {
+  const parsed = parseBarcode(raw);
+  return (parsed.serialNo ?? raw)
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9\-\/]/g, '');
+};
+
+const isValidSerial = (serial: string): boolean => (
+  serial.length >= MIN_SERIAL_LEN &&
+  serial.length <= MAX_SERIAL_LEN
+);
 
 export default function OutwardPage({ setPage }: { setPage: (p: string) => void }) {
+  void setPage;
   const { user } = useAuth();
   const settings = getSettings();
 
@@ -33,24 +59,59 @@ export default function OutwardPage({ setPage }: { setPage: (p: string) => void 
   const [saving, setSaving] = useState(false);
   const [showChallan, setShowChallan] = useState(false);
   const [savedBatch, setSavedBatch] = useState<OutwardBatch | null>(null);
+  const [queueCount, setQueueCount] = useState(0);
+  const scannedSetRef = useRef<Set<string>>(new Set());
 
-  const addToast = (type: 'success' | 'error', message: string) => {
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const addToast = useCallback((type: 'success' | 'error', message: string) => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, type, message }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
-  };
+  }, []);
 
-  const handleSerialScan = async (raw: string) => {
-    const serial = raw.trim().toUpperCase();
-    if (!serial) return;
-    if (scannedItems.find(i => i.serialNo === serial)) { 
-      addToast('error', `Duplicate: ${serial}`); return; 
+  const handleSync = useCallback(async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const result = await flushOfflineQueue();
+      setQueueCount(getOfflineQueueCount());
+      if (result.synced > 0) {
+        addToast('success', `✅ Synced ${result.synced} offline operations`);
+      } else if (result.failed > 0) {
+        addToast('error', `⚠️ ${result.failed} items still pending. Check connection.`);
+      } else {
+        addToast('success', 'Up to date');
+      }
+    } catch (err) {
+      addToast('error', 'Sync failed. Try again later.');
+    } finally {
+      setIsSyncing(false);
     }
+  }, [isSyncing, addToast]);
+
+  const handleSerialScan = useCallback(async (raw: string) => {
+    const serial = normalizeSerial(raw);
+    if (!serial) return;
+    if (!isValidSerial(serial)) { addToast('error', `Invalid serial: ${serial}`); return; }
+    if (scannedSetRef.current.has(serial)) {
+      addToast('error', `Duplicate: ${serial}`); return;
+    }
+
+    scannedSetRef.current.add(serial);
     const item = await getItemBySerial(serial);
-    if (!item) { addToast('error', `❌ Not Found: ${serial}`); return; }
-    if (item.status !== 'IN STOCK') { addToast('error', `Already ${item.status}: ${serial}`); return; }
+    if (!item) {
+      scannedSetRef.current.delete(serial);
+      addToast('error', `❌ Not Found: ${serial}`);
+      return;
+    }
+    if (item.status !== 'IN STOCK') {
+      scannedSetRef.current.delete(serial);
+      addToast('error', `Already ${item.status}: ${serial}`);
+      return;
+    }
     setScannedItems(prev => [...prev, item]);
-  };
+  }, [addToast]);
 
   const buildBatch = (): OutwardBatch => ({
     id: Date.now().toString(), date: form.date, challanNo: form.challanNo,
@@ -60,16 +121,53 @@ export default function OutwardPage({ setPage }: { setPage: (p: string) => void 
     serialNos: scannedItems.map(i => i.serialNo), createdAt: new Date().toISOString(),
   });
 
+  useHidScannerCapture({ enabled: step === 2, onScan: (value) => { void handleSerialScan(value); } });
+
+  useEffect(() => {
+    const updateQueue = () => setQueueCount(getOfflineQueueCount());
+    updateQueue();
+
+    const onOnline = () => {
+      handleSync();
+    };
+
+    window.addEventListener('online', onOnline);
+    window.addEventListener('re-offline-queue-updated', updateQueue);
+
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('re-offline-queue-updated', updateQueue);
+    };
+  }, [addToast]);
+
   const handleConfirm = async () => {
     if (!form.buyerName) { addToast('error', 'Buyer Name required.'); return; }
     if (scannedItems.length === 0) { addToast('error', 'No items added.'); return; }
     setSaving(true);
     const batch = buildBatch();
-    await saveOutwardBatch(batch);
-    await addActivityLog({ staffId: user?.id || '', staffName: user?.name || '', action: 'OUTWARD', batchSize: batch.serialNos.length, notes: `Challan ${batch.challanNo}` });
-    setSavedBatch(batch); addToast('success', `🚀 Dispatch Confirmed: ${batch.challanNo}`);
-    setScannedItems([]); setForm(p => ({ ...p, challanNo: generateChallanNo(), buyerName: '', buyerGstin: '', remarks: '' }));
-    setSaving(false); setShowChallan(true); setStep(1);
+
+    try {
+      const saveRes = await saveOutwardBatch(batch);
+      const logRes = await addActivityLog({ staffId: user?.id || '', staffName: user?.name || '', action: 'OUTWARD', batchSize: batch.serialNos.length, notes: `Challan ${batch.challanNo}` });
+
+      setSavedBatch(batch);
+      if (saveRes.status === 'queued' || logRes.status === 'queued') {
+        addToast('success', `📦 Dispatch queued offline. Will auto-sync when online.`);
+      } else {
+        addToast('success', `🚀 Dispatch Confirmed: ${batch.challanNo}`);
+      }
+
+      scannedSetRef.current.clear();
+      setScannedItems([]);
+      setForm(p => ({ ...p, challanNo: generateChallanNo(), buyerName: '', buyerGstin: '', remarks: '' }));
+      setQueueCount(getOfflineQueueCount());
+      setShowChallan(true);
+      setStep(1);
+    } catch {
+      addToast('error', '❌ Failed to confirm dispatch. Please retry.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -77,7 +175,36 @@ export default function OutwardPage({ setPage }: { setPage: (p: string) => void 
       <div className="page-header">
         <div>
           <div className="page-header-title">📤 Outward Dispatch</div>
-          <div className="page-header-sub">Generate challan for sale or transfer</div>
+          <div className="page-header-sub">
+            Generate challan for sale or transfer
+            {isOfflineMode() ? ' • Offline mode' : ''}
+            {queueCount > 0 ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', marginLeft: 8 }}>
+                • {queueCount} pending
+                <button 
+                  onClick={handleSync}
+                  disabled={isSyncing}
+                  style={{
+                    marginLeft: 8,
+                    padding: '2px 8px',
+                    fontSize: 10,
+                    background: 'var(--amber)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    fontWeight: 900,
+                    textTransform: 'uppercase',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4
+                  }}
+                >
+                  {isSyncing ? '⌛ Syncing...' : '🔄 Sync Now'}
+                </button>
+              </span>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -127,12 +254,18 @@ export default function OutwardPage({ setPage }: { setPage: (p: string) => void 
                 <div style={{ fontSize: 13, opacity: 0.8, fontWeight: 700 }}>CHALLAN: {form.challanNo}</div>
                 <div style={{ fontSize: 32, fontWeight: 800 }}>{scannedItems.length} Products</div>
               </div>
-              <BarcodeScanner onScan={handleSerialScan} label="Scan Dispatch Serial..." />
+              <BarcodeScanner onScan={(value) => { void handleSerialScan(value); }} label="Scan Dispatch Serial..." debounceMs={800} />
               <div className="mt-6">
                 <label className="form-label">Manual Add</label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <input type="text" className="form-control" placeholder="Type serial..." value={serialInput} 
-                    onChange={e => setSerialInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (setSerialInput(''), handleSerialScan(serialInput))} />
+                  <input type="text" className="form-control" placeholder="Type serial..." value={serialInput}
+                    onChange={e => setSerialInput(e.target.value)} onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        const value = serialInput;
+                        setSerialInput('');
+                        void handleSerialScan(value);
+                      }
+                    }} />
                 </div>
               </div>
             </div>
@@ -147,7 +280,12 @@ export default function OutwardPage({ setPage }: { setPage: (p: string) => void 
                       <div style={{ fontWeight: 800 }}>{item.serialNo}</div>
                       <div style={{ fontSize: 10, opacity: 0.8 }}>{item.brand} - {item.model}</div>
                     </div>
-                    <button onClick={() => { if(window.confirm(`Are you sure you want to remove ${item.serialNo}?`)) setScannedItems(p => p.filter(i => i.serialNo !== item.serialNo)) }} style={{ border: 'none', background: 'none', color: '#fff', cursor: 'pointer', fontSize: 18 }}>✕</button>
+                    <button onClick={() => {
+                      if (window.confirm(`Are you sure you want to remove ${item.serialNo}?`)) {
+                        scannedSetRef.current.delete(item.serialNo);
+                        setScannedItems(p => p.filter(i => i.serialNo !== item.serialNo));
+                      }
+                    }} style={{ border: 'none', background: 'none', color: '#fff', cursor: 'pointer', fontSize: 18 }}>✕</button>
                   </div>
                 ))}
               </div>

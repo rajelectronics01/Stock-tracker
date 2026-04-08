@@ -1,14 +1,23 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { getSettings, saveInwardBatch, addActivityLog, saveModelToBrand } from '@/lib/store';
-import { useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  getSettings,
+  saveInwardBatch,
+  addActivityLog,
+  saveModelToBrand,
+  flushOfflineQueue,
+  getOfflineQueueCount,
+  isOfflineMode,
+} from '@/lib/store';
 import { useAuth } from '@/lib/auth-context';
-import type { AppSettings, InwardBatch } from '@/lib/types';
+import type { InwardBatch } from '@/lib/types';
 import dynamic from 'next/dynamic';
 const BarcodeScanner = dynamic(() => import('../BarcodeScanner'), { ssr: false });
 import Toast from '../Toast';
 import ExcelUpload from '../ExcelUpload';
+import { parseBarcode } from '@/lib/barcode-parser';
+import { useHidScannerCapture } from '@/hooks/useHidScannerCapture';
 
 const BRANDS = [
   { name: 'Lloyd', icon: '❄️', image: '/brands/lloyd.png' },
@@ -34,39 +43,78 @@ export default function InwardPage() {
   const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [product, setProduct] = useState({ brand: '', model: '', category: '', hsnCode: '' });
-  const [godown, setGodown] = useState('');
+  const [godown, setGodown] = useState(() => getSettings().godowns[0] || '');
   const [batchDate, setBatchDate] = useState(new Date().toISOString().split('T')[0]);
-  const [supplier, setSupplier] = useState('');
   const [serialNos, setSerialNos]     = useState<string[]>([]);
   const [manualSerial, setManualSerial] = useState('');
   const [toasts, setToasts]           = useState<{ id: number; type: 'success' | 'error'; message: string }[]>([]);
-  const [settings, setSettings]       = useState<AppSettings | null>(null);
+  const settings = getSettings();
+  const [queueCount, setQueueCount]   = useState(0);
   // Ref-based set for SYNCHRONOUS duplicate checking — avoids stale closure bug
   // where two rapid scans both see serialNos=[] and both get added
   const scannedSetRef = useRef<Set<string>>(new Set());
 
   const modelInputRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const s = getSettings();
-    setSettings(s);
-    if (s.godowns.length > 0) setGodown(s.godowns[0]);
-  }, []);
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  const addToast = (type: 'success' | 'error', message: string) => {
+  const addToast = useCallback((type: 'success' | 'error', message: string) => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, type, message }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
-  };
+  }, []);
 
-  const handleSerialScan = (serial: string) => {
-    const s = serial.trim().toUpperCase();
+  const handleSync = useCallback(async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const result = await flushOfflineQueue();
+      setQueueCount(getOfflineQueueCount());
+      if (result.synced > 0) {
+        addToast('success', `✅ Synced ${result.synced} offline operations`);
+      } else if (result.failed > 0) {
+        addToast('error', `⚠️ ${result.failed} items still pending. Check connection.`);
+      } else {
+        addToast('success', 'Up to date');
+      }
+    } catch (err) {
+      addToast('error', 'Sync failed. Try again later.');
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [isSyncing, addToast]);
+
+  useEffect(() => {
+    const updateQueue = () => setQueueCount(getOfflineQueueCount());
+    updateQueue();
+
+    const onOnline = () => {
+      handleSync();
+    };
+
+    window.addEventListener('online', onOnline);
+    window.addEventListener('re-offline-queue-updated', updateQueue);
+
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('re-offline-queue-updated', updateQueue);
+    };
+  }, [addToast]);
+
+  const handleSerialScan = useCallback((raw: string) => {
+    const parsed = parseBarcode(raw);
+    const s = (parsed.serialNo ?? raw)
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9\-\/]/g, '');
     if (!s) return;
     // Check ref FIRST (synchronous) — prevents duplicates from rapid fire scans
     if (scannedSetRef.current.has(s)) return;
     scannedSetRef.current.add(s);
     setSerialNos(prev => [...prev, s]);
-  };
+  }, []);
+
+  useHidScannerCapture({ enabled: step === 2, onScan: handleSerialScan });
 
   const removeSerial = (serial: string) => {
     if (window.confirm(`Are you sure you want to remove ${serial}?`)) {
@@ -85,18 +133,28 @@ export default function InwardPage() {
       model: product.model, category: product.category || 'General', hsnCode: product.hsnCode,
       staffId: user?.id || '', staffName: user?.name || '', serialNos, createdAt: new Date().toISOString(),
     };
-    const { added, skipped } = await saveInwardBatch(batch);
-    saveModelToBrand(product.brand, product.model);
-    await addActivityLog({
-      action: 'INWARD', staffId: user?.id || '', staffName: user?.name || '',
-      godown, batchSize: added, notes: `Inward: ${product.brand} ${product.model}`
-    });
-    if (skipped.length > 0) {
-      addToast('error', `⚠️ ${skipped.length} duplicate serials skipped.`);
+    try {
+      const { added, skipped, status } = await saveInwardBatch(batch);
+      saveModelToBrand(product.brand, product.model);
+      const logRes = await addActivityLog({
+        action: 'INWARD', staffId: user?.id || '', staffName: user?.name || '',
+        godown, batchSize: added, notes: `Inward: ${product.brand} ${product.model}`
+      });
+      if (skipped.length > 0) {
+        addToast('error', `⚠️ ${skipped.length} duplicate serials skipped.`);
+      }
+      if (status === 'queued' || logRes.status === 'queued') {
+        addToast('success', `📦 ${added} items queued offline. Will auto-sync when online.`);
+      } else {
+        addToast('success', `✅ ${added} items saved to cloud inventory!`);
+      }
+      scannedSetRef.current.clear(); // reset dedup ref after save
+      setSerialNos([]);
+      setManualSerial('');
+      setQueueCount(getOfflineQueueCount());
+    } catch {
+      addToast('error', '❌ Failed to save inward batch. Please retry.');
     }
-    addToast('success', `✅ ${added} items saved to cloud inventory!`);
-    scannedSetRef.current.clear(); // reset dedup ref after save
-    setTimeout(() => window.location.reload(), 1800);
   };
 
   if (!settings) return null;
@@ -108,7 +166,36 @@ export default function InwardPage() {
       <div className="page-header">
         <div>
           <div className="page-header-title">📥 Inward Stock</div>
-          <div className="page-header-sub">Scan received stock into inventory</div>
+          <div className="page-header-sub">
+            Scan received stock into inventory
+            {isOfflineMode() ? ' • Offline mode' : ''}
+            {queueCount > 0 ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', marginLeft: 8 }}>
+                • {queueCount} pending
+                <button 
+                  onClick={handleSync}
+                  disabled={isSyncing}
+                  style={{
+                    marginLeft: 8,
+                    padding: '2px 8px',
+                    fontSize: 10,
+                    background: 'var(--blue)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    fontWeight: 900,
+                    textTransform: 'uppercase',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4
+                  }}
+                >
+                  {isSyncing ? '⌛ Syncing...' : '🔄 Sync Now'}
+                </button>
+              </span>
+            ) : null}
+          </div>
         </div>
         <ExcelUpload onComplete={(msg) => addToast(msg.includes('✅') ? 'success' : 'error', msg)} />
       </div>
@@ -221,12 +308,18 @@ export default function InwardPage() {
                 </div>
                 <button className="btn btn-secondary btn-sm" onClick={() => setStep(1)} style={{ padding: '8px 12px' }}>Edit</button>
               </div>
-              <BarcodeScanner onScan={handleSerialScan} label="Snap Scan Active" />
+              <BarcodeScanner onScan={handleSerialScan} label="Snap Scan Active" debounceMs={500} />
               <div className="mt-6">
                 <label className="form-label">Manual Entry</label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <input type="text" className="form-control" placeholder="Type serial..." value={manualSerial} 
-                    onChange={e => setManualSerial(e.target.value)} onKeyDown={e => e.key === 'Enter' && (handleSerialScan(manualSerial), setManualSerial(''))} />
+                  <input type="text" className="form-control" placeholder="Type serial..." value={manualSerial}
+                    onChange={e => setManualSerial(e.target.value)} onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        const value = manualSerial;
+                        setManualSerial('');
+                        handleSerialScan(value);
+                      }
+                    }} />
                 </div>
               </div>
             </div>
